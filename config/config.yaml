@@ -26,7 +26,7 @@ COUNTS_FILEPATH_PATTERN: manuscript_data/counts/{screen}_raw_counts.zip
 # See _DOUBLINGS variables below for an example. 
 
 ### Counts column prefixes and suffixes
-COUNT_PREFIXES: [T0, DMSO, TREATED]
+COUNT_PREFIXES: [T0, DMSO, NIRAP]
 REPLICATES: [R1, R2]
 
 ### Column name prefix for initial condition counts
@@ -38,8 +38,8 @@ INITIAL_CONDITION_ID: T0
 ### Phenotypes are calculated as <FIRST_PREFIX> / <SECOND_PREFIX>
 PHENOTYPE_PREFIX_MAP:
   Gamma: [DMSO, T0]
-  Tau: [TREATED, T0]
-  Rho: [TREATED, DMSO]
+  Tau: [NIRAP, T0]
+  Rho: [NIRAP, DMSO]
 
 ### Phenotypes to use for genetic interaction score calculation
 ### Must match keys in PHENOTYPE_PREFIX_MAP, but doesn't need to be all of them
@@ -66,9 +66,6 @@ HIT_THRESHOLDS:
 ###############################################################################
 ###############################################################################
 
-# Filter parameters, adjustable
-# Cannot be set as screen-specific, settings will apply to all screens that are processed
-
 ### Count filter thresholds
 INDIVIDUAL_SGRNA_MEDIAN_THRESHOLD: 35
 COMBINATION_SGRNA_COUNT_THRESHOLD: 50
@@ -80,7 +77,7 @@ AVERAGE_REPLICATES: TRUE
 
 ### Correlation filter parameters
 NO_CORRELATION_THRESHOLD: 0.25
-CORRELATION_FILTER_MODE: avg_only  # or "any" or "all"
+CORRELATION_FILTER_MODE: avg_only  
 
 ###############################################################################
 ###############################################################################
@@ -105,18 +102,8 @@ SCREEN2023_DOUBLINGS:
     R1: 5.40
     R2: 4.98
 
-SCREEN2022_PHENOTYPE_PREFIX_MAP:
-  GAMMA: [DMSO, T0]
-  TAU: [NIRAP, T0]
-  RHO: [NIRAP, DMSO]
-
-SCREEN2023_PHENOTYPE_PREFIX_MAP:
-  GAMMA: [DMSO, T0]
-  TAU: [NIRAP, T0]
-  RHO: [NIRAP, DMSO]
-
-SCREEN2022_COUNT_PREFIXES: [T0, DMSO, NIRAP]
-SCREEN2023_COUNT_PREFIXES: [T0, DMSO, NIRAP]
+###############################################################################
+###############################################################################
 
 ### Clustering parameters
 PHENOTYPES_TO_CLUSTER: [GAMMA.OI.Avg, TAU.OI.Avg, NU.OI.Avg]
@@ -128,14 +115,9 @@ PHENOTYPES_TO_CLUSTER: [GAMMA.OI.Avg, TAU.OI.Avg, NU.OI.Avg]
 ###############################################################################
 
 # These parameters control internal workings of the pipeline and should not
-# be modified unless you know what you're doing. These column names are expected
-# and used throughout the codebase. Changing them may lead to unexpected errors.
+# be modified. These column names are expected and used throughout the codebase. 
+# Changing them may lead to unexpected errors.
 
-# If you want to provide your own counts metadata file, ensure it contains at 
-# least these columns.
-
-### Default metadata  columns that are expected to be in counts file
-### These are automatically generated if mode is counts_only
 EXPECTED_META_COLUMNS:
   - FirstPosition
   - FirstPseudogene

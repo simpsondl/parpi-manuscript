@@ -1,93 +1,68 @@
-# Genetic Interaction Analysis Pipeline
+# PARP Inhibitor Genetic Interaction Manuscript
 
-A Snakemake-based pipeline for end-to-end processing of genetic interaction (GI) screens, from raw counts through quality filtering, phenotype calculation, GI score computation, differential analysis, and hit identification.
+This repository contains the stable, reproducible analysis code and data for the PARP inhibitor genetic interaction manuscript. It is a frozen snapshot specifically configured to regenerate all figures and analyses presented in the publication.
 
 **📊 Interactive Data Portal**: https://parpi.princeton.edu/map
 
-**📖 Full Documentation**: See [PIPELINE_DOCUMENTATION.md](PIPELINE_DOCUMENTATION.md) for comprehensive setup guide, configuration options, and pipeline details.
+**🔧 General-Purpose Pipeline**: For analyzing your own genetic interaction screens, please consider [GI Nexus](https://github.com/simpsondl/gi-nexus), an actively maintained version of the analysis pipeline.
 
-## Overview
+## Purpose
 
-This pipeline:
-- Processes multiple screens in parallel with flexible, per-screen configuration
-- Calculates customizable phenotypes (Gamma, Tau, Rho, etc.)
-- Computes genetic interaction scores at construct and gene levels
-- Performs differential interaction analysis across conditions
-- Applies sophisticated quality control and correlation filtering
-- Supports compressed (ZIP) input files and high-precision numerical calculations
+This repository is designed for:
+- **Reproducing manuscript figures and analyses** using the exact configurations and data from the publication
+- **Understanding the methods** used to process the PARP inhibitor screens
+- **Accessing the raw screen data** and intermediate analysis outputs
+
+For general genetic interaction analysis of new datasets, please use the [main pipeline repository](https://github.com/simpsondl/gi-nexus).
+
+## Repository Contents
+
+- `manuscript_data/` - Raw count tables and annotations for the two PARP inhibitor screens (2022 and 2023)
+- `config/config.yaml` - Exact configuration parameters used for the manuscript analyses
+- `workflow/` - Snakemake workflow and R scripts (stable version from publication)
+- `workflow/scripts/manuscript_figures/` - Figure generation scripts
 
 ## Quick Start
 
-### 1. Clone the repository
+### 1. Clone this repository
 ```bash
-git clone https://github.com/simpsondl/genetic-interactions-smk.git
-cd genetic-interactions-smk
+git clone https://github.com/simpsondl/parpi-manuscript.git
+cd parpi-manuscript
 ```
 
-### 2. Set up environment
+### 2. Set up the environment
 ```bash
 # Create and activate conda environment
 conda env create -f workflow/envs/smk-env.yaml
 conda activate differential_gi_smk
 ```
 
-### 3. Configure the pipeline
-The provided config file (`config/config.yaml`) contains the parameters that were used to process the provided screens. By creating a new config file and passing its path as a command line argument, or by editing `config/config.yaml` directly, users can specify:
-- Screen names and input file locations
-- Phenotype definitions and treatment names
-- Population doublings (if normalizing)
-- Filter thresholds and hit-calling parameters
-
-See [Configuration Guide](PIPELINE_DOCUMENTATION.md#configuration-guide) for detailed instructions.
-
-### 4. Run the pipeline
+### 3. Run the complete analysis
 ```bash
 # Dry run to preview execution plan
-snakemake -n --snakefile workflow/Snakefile --configfile config/config.yaml
+snakemake --use-conda -n --snakefile workflow/Snakefile --configfile config/config.yaml
 
-# Run complete pipeline (adjust cores as needed)
-snakemake --cores 4 --snakefile workflow/Snakefile --configfile config/config.yaml
+# Execute the full pipeline to generate all outputs and figures
+snakemake --use-conda --cores 4 --snakefile workflow/Snakefile --configfile config/config.yaml
 ```
+
+The pipeline will process both screens and generate all manuscript figures. Expected runtime: ~1 hour on a desktop (16GB RAM, 6 cores).
 
 ## Requirements
 
 - **Snakemake** (≥9.12.0)
-- **R** with tidyverse packages (readr, dplyr, broom, data.table)
+- **R** (≥4.0) with tidyverse packages
 - **Conda** (recommended for reproducible environments)
 
-Environment specifications are provided in `workflow/envs/`.
+All dependencies are specified in `workflow/envs/`.
 
-## Key Features
+## Outputs
 
-- ✅ **Automatic metadata generation** for simplified input requirements
-- ✅ **ZIP file support** for compressed count files (>100 MB)
-- ✅ **Per-screen parameter overrides** for maximum flexibility
-- ✅ **Multiple phenotype processing** in a single run
-- ✅ **High-precision numerical I/O** to prevent rounding errors
-- ✅ **Sequential correlation filtering** for quality control
-- ✅ **Parallel execution** across screens, replicates, and phenotypes
-- ✅ **Comprehensive logging** for debugging and transparency
-
-## Output
-
-Results are organized in `outputs/` directory:
-- `counts/` - Validated counts with metadata
-- `phenotypes/` - Calculated and filtered phenotypes
-- `gi_scores/` - Genetic interaction scores (construct, gene, discriminant levels)
-- `annotations/` - ID mapping files
-- `misc_results/` - QC metrics and filter flags
-
-The complete pipeline takes ~1 hour to process the two provided screens on a desktop (16GB RAM, 6 cores) and generates ~11 GB of final outputs.
-
-## Documentation
-
-For comprehensive documentation including:
-- Detailed configuration guide with examples
-- Pipeline stage descriptions and workflows
-- Feature explanations and adaptability options
-- Troubleshooting guide and validation checklist
-
-See **[PIPELINE_DOCUMENTATION.md](PIPELINE_DOCUMENTATION.md)**
+Results will be generated in the `outputs/` directory:
+- `phenotypes/` - Calculated phenotypes and filtered interaction scores
+- `gi_scores/` - Genetic interaction scores at construct and gene levels
+- `figures/` - Manuscript figures (PDF format)
+- `misc_results/` - Quality control metrics and supplementary data
 
 ## Citation
 
