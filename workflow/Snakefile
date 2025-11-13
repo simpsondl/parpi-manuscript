@@ -11,20 +11,24 @@ configfile: "../config/config.yaml"
 OUTPUTS_DIR = config.get("OUTPUTS_DIR", "../outputs")
 LOGS_DIR = config.get("LOGS_DIR", "../outputs/logs")
 
+
 include: "rules/helper_input_functions.smk"
 
+
 rule process_all:
-   input:
-       lambda wildcards: _expand_discriminant_score_targets(wildcards),
-       lambda wildcards: _expand_differential_score_targets(wildcards),
-       lambda wildcards: _expand_hit_targets(wildcards)
-       
+    input:
+        lambda wildcards: _expand_discriminant_score_targets(wildcards),
+        lambda wildcards: _expand_differential_score_targets(wildcards),
+        lambda wildcards: _expand_hit_targets(wildcards),
+
+
 rule generate_manuscript_figures:
     input:
         f"{OUTPUTS_DIR}/manuscript_figures/figure_1d.svg",
         f"{OUTPUTS_DIR}/manuscript_figures/figure_1e.svg",
         f"{OUTPUTS_DIR}/manuscript_figures/figure_2a.png",
-        f"{OUTPUTS_DIR}/manuscript_figures/figure_2a_labels.png"
+        f"{OUTPUTS_DIR}/manuscript_figures/figure_2a_labels.png",
+
 
 include: "rules/metadata_generation.smk"
 include: "rules/preprocess.smk"
