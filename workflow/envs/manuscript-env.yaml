@@ -1,8 +1,8 @@
-name: manuscript_smk
+name: parpi_manuscript
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
   - python=3.13.9
   - snakemake=9.12.0

@@ -11,7 +11,7 @@ rule compute_genetic_interaction_scores:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_compute_genetic_interaction_scores.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     wildcard_constraints:
         score="(Gamma.*|Tau.*)"
     params:
@@ -24,14 +24,14 @@ rule calculate_gene_level_scores:
     input:
         input_gi_scores="../outputs/gi_scores/{screen}/construct_scores/all_gis_{score}.tsv",
         input_gi_workspace="../outputs/gi_scores/{screen}/construct_scores/gi_workspace_{score}.rds",
-        input_idmap="data/annotations/{screen}_id_to_name_mapping.tsv"
+        input_idmap="manuscript_data/annotations/{screen}_id_to_name_mapping.tsv"
     output:
         output_gene_level_scores="../outputs/gi_scores/{screen}/gene_combination_scores/gene_combination_scores_{score}.tsv",
         output_gene_level_workspace=temp("../outputs/gi_scores/{screen}/gene_combination_scores/gene_level_workspace_{score}.rds")
     log:
         "../outputs/logs/{screen}/{screen}_{score}_calculate_gene_level_scores.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
         score=lambda wildcards: wildcards.score,
         screen=lambda wildcards: wildcards.screen
@@ -49,7 +49,7 @@ rule calculate_discriminant_scores:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_calculate_discriminant_scores.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
         score=lambda wildcards: wildcards.score,
         screen=lambda wildcards: wildcards.screen
@@ -62,7 +62,7 @@ rule calculate_differential_scores:
         input_tau_gi_scores="../outputs/gi_scores/{screen}/construct_scores/all_gis_Tau.{rep}.tsv",
         input_gamma_workspace="../outputs/gi_scores/{screen}/construct_scores/gi_workspace_Gamma.{rep}.rds",
         input_tau_workspace="../outputs/gi_scores/{screen}/construct_scores/gi_workspace_Tau.{rep}.rds",
-        input_idmap="data/annotations/{screen}_id_to_name_mapping.tsv"
+        input_idmap="manuscript_data/annotations/{screen}_id_to_name_mapping.tsv"
     output:
         output_differential_scores="../outputs/gi_scores/{screen}/construct_scores/all_gis_Nu.{rep}.tsv",
         output_gene_differential_scores="../outputs/gi_scores/{screen}/gene_combination_scores/gene_combination_scores_Nu.{rep}.tsv",
@@ -71,7 +71,7 @@ rule calculate_differential_scores:
     log:
         "../outputs/logs/{screen}/{screen}_Nu.{rep}_calculate_differential_scores.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
         rep=lambda wildcards: wildcards.rep,
         screen=lambda wildcards: wildcards.screen
@@ -88,7 +88,7 @@ rule call_hits:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_call_hits.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
         threshold=lambda wildcards: config["DIFFERENTIAL_HIT_THRESHOLD"] if str(wildcards.score).startswith("Nu") else config["HIT_THRESHOLD"],
         score=lambda wildcards: wildcards.score,

@@ -9,7 +9,7 @@ configfile: "../config/config.yaml"
 
 include: "rules/helper_input_functions.smk"
 
-rule process_all_gi_scores:
+rule process_screens:
    input:
        lambda wildcards: _expand_discriminant_score_targets(wildcards),
        lambda wildcards: _expand_differential_score_targets(wildcards),

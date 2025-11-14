@@ -6,7 +6,7 @@ rule apply_count_filters:
     log:
         "../outputs/logs/{screen}/{screen}_apply_count_filters.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
         individual_sgRNA_median_threshold=config["INDIVIDUAL_SGRNA_MEDIAN_THRESHOLD"],
         combination_sgRNA_count_threshold=config["COMBINATION_SGRNA_COUNT_THRESHOLD"],
@@ -25,7 +25,7 @@ rule calculate_phenotypes:
     log:
         "../outputs/logs/{screen}/{screen}_calculate_phenotypes.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
         counts_cols=lambda wildcards: config[f"{wildcards.screen.upper()}_COUNTS_COLUMNS"],
         pseudocount=config["PSEUDOCOUNT"],
@@ -50,7 +50,7 @@ rule apply_correlation_filter:
     log:
         "../outputs/logs/{screen}/{screen}_apply_correlation_filter.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
         no_correlation_threshold=config["NO_CORRELATION_THRESHOLD"]
     script:

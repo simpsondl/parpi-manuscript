@@ -2,8 +2,8 @@ import os
 
 
 def _choose_counts(wildcards):
-    tsv = f"data/counts/{wildcards.screen}_raw_counts.tsv"
-    zipf = f"data/counts/{wildcards.screen}_raw_counts.zip"
+    tsv = f"manuscript_data/counts/{wildcards.screen}_raw_counts.tsv"
+    zipf = f"manuscript_data/counts/{wildcards.screen}_raw_counts.zip"
     if os.path.exists(tsv):
         return tsv
     if os.path.exists(zipf):
