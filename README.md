@@ -1,6 +1,6 @@
 # PARP Inhibitor Genetic Interaction Manuscript
 
-This repository contains the stable, reproducible analysis code and data for the PARP inhibitor genetic interaction manuscript. It is a frozen snapshot specifically configured to regenerate all figures and analyses presented in the publication.
+This repository contains the stable, reproducible analysis code and data for the PARP inhibitor genetic interaction manuscript. It is a specifically configured to regenerate all analyses and key figures presented in the publication.
 
 **📊 Interactive Data Portal**: https://parpi.princeton.edu/map
 
@@ -13,7 +13,7 @@ This repository is designed for:
 - **Understanding the methods** used to process the PARP inhibitor screens
 - **Accessing the raw screen data** and intermediate analysis outputs
 
-For general genetic interaction analysis of new datasets, please use the [main pipeline repository](https://github.com/simpsondl/gi-nexus).
+For general genetic interaction analysis of new datasets, check out [GI Nexus](https://github.com/simpsondl/gi-nexus).
 
 ## Repository Contents
 

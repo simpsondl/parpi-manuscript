@@ -16,7 +16,7 @@ SCREENS: [screen2022, screen2023]
 ### Use {screen} as a placeholder for screen names
 ### Supports both TSV and ZIP files 
 ### ZIP should contain a file ending in _counts.tsv, _counts_only.tsv, or _counts_with_metadata.tsv
-COUNTS_FILEPATH_PATTERN: ../manuscript_data/counts/{screen}_raw_counts.zip
+COUNTS_FILEPATH_PATTERN: ../manuscript_data/{screen}_raw_counts.zip
 
 ###############################################################################
 ###############################################################################
