@@ -13,7 +13,7 @@ rule compute_genetic_interaction_scores:
     conda:
         "../envs/smk-env.yaml"
     wildcard_constraints:
-        score="(Gamma\..*|Tau\..*)"
+        score="(Gamma.*|Tau.*)"
     params:
         screen=lambda wildcards: wildcards.screen,
         score=lambda wildcards: wildcards.score
