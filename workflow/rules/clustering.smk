@@ -1,23 +1,18 @@
-rule diagnostic_plot:
+rule cluster_genes:
     input:
-        input_scores="../outputs/gi_scores/{screen}/gene_combination_scores/gene_combination_scores_{score}.tsv",
-        input_idmap="data/annotations/{screen}_id_to_name_mapping.tsv"
+        input_scores="../outputs/gi_scores/{screen}/gene_combination_scores/gene_combination_scores_{score}.tsv"
     output:
-        output_diagnostic_plot="../outputs/gi_scores/{screen}/clusters/diagnostic_plot_{score}.svg"
+        output_clusters="../outputs/gi_scores/{screen}/clusters/gene_clusters_{score}.tsv"
     log:
-        "../outputs/logs/{screen}/{screen}_{score}_diagnostic_plot.log"
+        "../outputs/logs/{screen}/{screen}_{score}_gene_clustering.log"
     conda:
-        "../envs/smk-env.yaml"
+        "../envs/manuscript-env.yaml"
     params:
-        score=lambda wildcards: wildcards.score,
-        screen=lambda wildcards: wildcards.screen
+        soft_threshold_power=lambda wildcards: config["SOFT_THRESHOLD_POWER"][config["PHENOTYPES_TO_CLUSTER"].index(wildcards.score)]
     script:
-        "../scripts/diagnostic_plot.R"
+        "../scripts/cluster_genes.R"
 
-###########################################
-# Wrapper rules to perform all clustering #
-###########################################
 
-rule plot_all_diagnostic_plots:
+rule cluster_all_phenotypes:
     input:
-        lambda wildcards: _expand_diagnostic_plots(wildcards)
+        lambda wildcards: _expand_gene_clusters(wildcards)

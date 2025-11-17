@@ -34,3 +34,4 @@ DIFFERENTIAL_HIT_THRESHOLD: 1
 
 ### Clustering parameters
 PHENOTYPES_TO_CLUSTER: ["Gamma.OI.Avg", "Tau.OI.Avg", "Nu.OI.Avg"]
+SOFT_THRESHOLD_POWER: [4, 4, 4]

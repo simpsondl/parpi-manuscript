@@ -94,15 +94,16 @@ def _expand_differential_hit_targets(wc=None):
     return targets
 
 
-def _expand_diagnostic_plots(wc=None):
+def _expand_gene_clusters(wc=None):
     screens = config.get("SCREENS")
     if screens is None:
         screens = [k.lower().split("_GI_SCORES")[0].lower() for k in config if k.endswith("_GI_SCORES")]
     targets = []
     for sc in screens:
-        targets += expand("../outputs/gi_scores/{screen}/clusters/diagnostic_plot_{score}.svg",
+        targets += expand("../outputs/gi_scores/{screen}/clusters/gene_clusters_{score}.tsv",
                           screen=sc, score=config.get("PHENOTYPES_TO_CLUSTER"))
     return targets
+
 
 
 def _gi_orientation_indep_phenotype(wildcards):

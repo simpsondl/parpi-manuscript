@@ -1,10 +1,8 @@
-# PARP Inhibitor Genetic Interaction Manuscript
+# Mapping the genetic interaction network of PARPi response
 
-This repository contains the stable, reproducible analysis code and data for the PARP inhibitor genetic interaction manuscript. It is a frozen snapshot specifically configured to regenerate all figures and analyses presented in the publication.
+This repository contains the reproducible analysis code and data for our PARP inhibitor genetic interaction manuscript. It is a frozen snapshot of an early GI Nexus build specifically configured to regenerate all analyses and key figures presented in the publication.
 
 **📊 Interactive Data Portal**: https://parpi.princeton.edu/map
-
-**🔧 General-Purpose Pipeline**: For analyzing your own genetic interaction screens, please consider [GI Nexus](https://github.com/simpsondl/gi-nexus), an actively maintained version of the analysis pipeline.
 
 ## Purpose
 
@@ -13,7 +11,7 @@ This repository is designed for:
 - **Understanding the methods** used to process the PARP inhibitor screens
 - **Accessing the raw screen data** and intermediate analysis outputs
 
-For general genetic interaction analysis of new datasets, please use the [main pipeline repository](https://github.com/simpsondl/gi-nexus).
+**🔧 General-Purpose Pipeline**: For analyzing your own genetic interaction screens, please consider [GI Nexus](https://github.com/simpsondl/gi-nexus), a more-developed and feature-rich version of the analysis pipeline implemented here and in our manuscript.
 
 ## Repository Contents
 
@@ -33,8 +31,8 @@ cd parpi-manuscript
 ### 2. Set up the environment
 ```bash
 # Create and activate conda environment
-conda env create -f workflow/envs/smk-env.yaml
-conda activate differential_gi_smk
+conda env create -f workflow/envs/manuscript-env.yaml
+conda activate parpi_manuscript
 ```
 
 ### 3. Run the complete analysis
@@ -43,7 +41,7 @@ conda activate differential_gi_smk
 snakemake --use-conda -n --snakefile workflow/Snakefile --configfile config/config.yaml
 
 # Execute the full pipeline to generate all outputs and figures
-snakemake --use-conda --cores 4 --snakefile workflow/Snakefile --configfile config/config.yaml
+snakemake --use-conda --cores 6 --snakefile workflow/Snakefile --configfile config/config.yaml
 ```
 
 The pipeline will process both screens and generate all manuscript figures. Expected runtime: ~1 hour on a desktop (16GB RAM, 6 cores).
@@ -58,11 +56,12 @@ All dependencies are specified in `workflow/envs/`.
 
 ## Outputs
 
-Results will be generated in the `outputs/` directory:
+Results and logs will be generated in the `outputs/` directory:
+- `logs/` - Detailed logs for each step
+- `misc_results/` - Quality control metrics and supplementary data
 - `phenotypes/` - Calculated phenotypes and filtered interaction scores
 - `gi_scores/` - Genetic interaction scores at construct and gene levels
-- `figures/` - Manuscript figures (PDF format)
-- `misc_results/` - Quality control metrics and supplementary data
+- `manuscript_figures/` - Manuscript figures
 
 ## Citation
 

@@ -14,6 +14,7 @@ dependencies:
   - r-ggplot2=4.0.0
   - r-ggrepel=0.9.6
   - r-wgcna=1.73
+  - r-tidyr
   - r-ggextra
   - r-svglite
   - r-reshape2
