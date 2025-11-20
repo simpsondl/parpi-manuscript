@@ -1,5 +1,6 @@
 library(readr)
 library(dplyr)
+library(data.table)
 
 source("scripts/helper_functions.R")
 source("scripts/r_precise_io.R")
