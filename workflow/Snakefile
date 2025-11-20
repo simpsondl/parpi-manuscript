@@ -24,6 +24,14 @@ rule generate_manuscript_figures:
         "../outputs/manuscript_figures/figure_2b.png",
         "../outputs/manuscript_figures/figure_2d.pdf",
         "../outputs/manuscript_figures/figure_3a.png",
+        "../outputs/manuscript_figures/figure_3b_gamma_negative.pdf",
+        "../outputs/manuscript_figures/figure_3b_tau_negative.pdf",
+        "../outputs/manuscript_figures/figure_3b_nu_negative.pdf",
+        "../outputs/manuscript_figures/figure_3b_gamma_positive.pdf",
+        "../outputs/manuscript_figures/figure_3b_tau_positive.pdf",
+        "../outputs/manuscript_figures/figure_3b_nu_positive.pdf",
+        "../outputs/manuscript_figures/figure_3b_positive_nu_cluster_labels.pdf",
+        "../outputs/manuscript_figures/figure_3b_negative_nu_cluster_labels.pdf"
 
 include: "rules/preprocess.smk"
 include: "rules/calculate_genetic_interaction_scores.smk"

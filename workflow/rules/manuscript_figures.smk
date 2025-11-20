@@ -93,9 +93,10 @@ rule plot_figure_3b_negative:
         input_nu="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Nu.OI.Avg.tsv",
         input_clusters="../outputs/gi_scores/screen2023/clusters/gene_clusters_Nu.OI.Avg.tsv"
     output:
-        output_figure_3b_gamma_neg="../outputs/manuscript_figures/figure_3b_gamma_negative.png",
-        output_figure_3b_tau_neg="../outputs/manuscript_figures/figure_3b_tau_negative.png",
-        output_figure_3b_nu_neg="../outputs/manuscript_figures/figure_3b_nu_negative.png"
+        output_figure_3b_gamma_neg="../outputs/manuscript_figures/figure_3b_gamma_negative.pdf",
+        output_figure_3b_tau_neg="../outputs/manuscript_figures/figure_3b_tau_negative.pdf",
+        output_figure_3b_nu_neg="../outputs/manuscript_figures/figure_3b_nu_negative.pdf",
+        output_figure_3b_negative_cluster_labels="../outputs/manuscript_figures/figure_3b_negative_nu_cluster_labels.pdf"
     log:
         "../outputs/logs/manuscript_figures/plot_figure_3b_negative.log"
     conda:
@@ -111,9 +112,10 @@ rule plot_figure_3b_positive:
         input_nu="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Nu.OI.Avg.tsv",
         input_clusters="../outputs/gi_scores/screen2023/clusters/gene_clusters_Nu.OI.Avg.tsv"
     output:
-        output_figure_3b_gamma_pos="../outputs/manuscript_figures/figure_3b_gamma_positive.png",
-        output_figure_3b_tau_pos="../outputs/manuscript_figures/figure_3b_tau_positive.png",
-        output_figure_3b_nu_pos="../outputs/manuscript_figures/figure_3b_nu_positive.png"
+        output_figure_3b_gamma_pos="../outputs/manuscript_figures/figure_3b_gamma_positive.pdf",
+        output_figure_3b_tau_pos="../outputs/manuscript_figures/figure_3b_tau_positive.pdf",
+        output_figure_3b_nu_pos="../outputs/manuscript_figures/figure_3b_nu_positive.pdf",
+        output_figure_3b_positive_cluster_labels="../outputs/manuscript_figures/figure_3b_positive_nu_cluster_labels.pdf"
     log:
         "../outputs/logs/manuscript_figures/plot_figure_3b_positive.log"
     conda:
