@@ -16,6 +16,7 @@ if (exists("snakemake") && !is.null(snakemake@log) && length(snakemake@log) > 0)
 message(sprintf("[%s] cluster_genes.R starting", Sys.time()))
 
 scores <- read_tsv(snakemake@input[["input_scores"]])
+nu_scores <- read_tsv(snakemake@input[["nu_scores"]])
 soft_threshold_power <- snakemake@params[["soft_threshold_power"]]
 
 message(sprintf("[%s] Input gene scores: %s (%d rows)", Sys.time(),
@@ -27,11 +28,14 @@ message(sprintf("[%s] Soft-thresholding power: %s",
 noncontrol_gene_gis <- scores[!grepl("NTPG_", scores$PseudogeneCombinationName),]
 message(sprintf("[%s] Filtered non-targeting interactions: %d -> %d rows",
                 Sys.time(), nrow(scores), nrow(noncontrol_gene_gis)))
-# In the manuscript, clustering was performed only on genes which appeared in all analyses
-noncontrol_gene_gis <- noncontrol_gene_gis[!grepl("BARD1", noncontrol_gene_gis$PseudogeneCombinationName),]
-message(sprintf("[%s] Filtered BARD1 interactions: %d rows remain",
-                Sys.time(), nrow(noncontrol_gene_gis)))
 message(sprintf("[%s] Unique genes to cluster: %d",
+                Sys.time(), length(unique(c(noncontrol_gene_gis$Pseudogene1, noncontrol_gene_gis$Pseudogene2)))))
+
+# Remove any constructs without nu scores
+noncontrol_gene_gis <- noncontrol_gene_gis %>%
+    filter(PseudogeneCombinationID %in% nu_scores$PseudogeneCombinationID)
+
+message(sprintf("[%s] Filtered to be consistent with manuscript. Removed interactions without nu scores. Unique genes to cluster: %d",
                 Sys.time(), length(unique(c(noncontrol_gene_gis$Pseudogene1, noncontrol_gene_gis$Pseudogene2)))))
 
 # Make a grid with gene names

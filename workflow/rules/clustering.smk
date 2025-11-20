@@ -1,6 +1,7 @@
 rule cluster_genes:
     input:
-        input_scores="../outputs/gi_scores/{screen}/gene_combination_scores/gene_combination_scores_{score}.tsv"
+        input_scores="../outputs/gi_scores/{screen}/gene_combination_scores/gene_combination_scores_{score}.tsv",
+        nu_scores="../outputs/gi_scores/{screen}/construct_scores/all_gis_Nu.OI.Avg.tsv"
     output:
         output_clusters="../outputs/gi_scores/{screen}/clusters/gene_clusters_{score}.tsv"
     log:

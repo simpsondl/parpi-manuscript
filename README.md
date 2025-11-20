@@ -30,21 +30,41 @@ cd parpi-manuscript
 
 ### 2. Set up the environment
 ```bash
-# Create and activate conda environment
+# Create and activate the full conda environment
 conda env create -f workflow/envs/manuscript-env.yaml
 conda activate parpi_manuscript
+# Or a minimal environment, for use with running by --use-conda
+# conda env create -f workflow/env/minmanuscript-env.yaml
+# conda activate minmanuscript
 ```
 
 ### 3. Run the complete analysis
 ```bash
 # Dry run to preview execution plan
-snakemake --use-conda -n --snakefile workflow/Snakefile --configfile config/config.yaml
+snakemake -n --snakefile workflow/Snakefile process_screens
+# If you installed the minimal environment, add --use-conda flag  
+# snakemake --use-conda -n --snakefile workflow/Snakefile process_screens
 
 # Execute the full pipeline to generate all outputs and figures
-snakemake --use-conda --cores 6 --snakefile workflow/Snakefile --configfile config/config.yaml
+snakemake --cores 6 --snakefile workflow/Snakefile process_screens
+# If you installed the minimal environment, add --use-conda flag  
+# snakemake --use-conda --cores 6 --snakefile workflow/Snakefile process_screens
 ```
 
-The pipeline will process both screens and generate all manuscript figures. Expected runtime: ~1 hour on a desktop (16GB RAM, 6 cores).
+The pipeline will process both screens and generate all data required to make the manuscript figures. Expected runtime: ~1 hour on a desktop (16GB RAM, 6 cores).
+
+### 4. Generate the manuscript figures
+```bash
+# Dry run to preview execution plan
+snakemake -n --snakefile workflow/Snakefile generate_manuscript_figures
+# If you installed the minimal environment, add --use-conda flag  
+# snakemake --use-conda -n --snakefile workflow/Snakefile process_screens
+
+# Execute the full pipeline to generate all outputs and figures
+snakemake --cores 6 --snakefile workflow/Snakefile process_screens
+# If you installed the minimal environment, add --use-conda flag  
+# snakemake --use-conda --cores 6 --snakefile workflow/Snakefile process_screens
+```
 
 ## Requirements
 
