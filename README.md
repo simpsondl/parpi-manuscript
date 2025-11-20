@@ -1,6 +1,6 @@
 # Mapping the Genetic Interaction Network of PARPi Response
 
-This repository contains the reproducible analysis code and data for our PARP inhibitor genetic interaction manuscript. It is a frozen snapshot of an early GI Nexus build specifically configured to regenerate all analyses and key figures presented [in our publication](https://www.biorxiv.org/content/10.1101/2023.08.19.553986v1).
+This repository contains the reproducible analysis code and data for our PARP inhibitor genetic interaction manuscript. It is a frozen snapshot of an early GI Nexus build (v1.0-beta) specifically configured to regenerate all analyses and key figures presented [in our publication](https://www.biorxiv.org/content/10.1101/2023.08.19.553986v1).
 
 **📊 Interactive Data Portal**: https://parpi.princeton.edu/map
 
@@ -15,10 +15,11 @@ This repository is designed for:
 
 ## Repository Content Highlights
 
-- `workflow/` - Snakemake workflow and R scripts (stable version from publication)
 - `manuscript_data/` - Raw count tables and annotations for the two PARP inhibitor screens (2022 and 2023)
+- `tutorial/` - R markdown document walking through the processing steps in the pipeline, function by function
 - `config/config.yaml` - Exact configuration parameters used for the manuscript analyses
-- `workflow/scripts/manuscript_figures/` - Figure generation scripts
+- `workflow/` - Snakemake workflow, conda environments, and R scripts oh my!
+- `workflow/scripts/manuscript_figures/` - Figure generation scripts, for those wondering about the magic
 
 ## Quick Start
 
@@ -57,6 +58,8 @@ snakemake --use-conda --cores 6 generate_manuscript_figures
 ```
 
 This part of the pipeline uses bioconductor packages, which can not be accessed through conda on Windows. It is still possible to use the pipeline on Windows by establishing your own environment first and installing needed packages manually, then adjusting `manuscript_figures.smk` appropriately. All used packages are available on Windows.
+
+Please note that the figure scripts output raw versions of figures which were then paneled in Adobe Illustrator. Label and text sizes, text placement, and legend placement were frequently changed in post-processing to accommodate figure structure.
 
 ## Requirements
 
