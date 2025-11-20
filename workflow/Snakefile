@@ -22,6 +22,8 @@ rule generate_manuscript_figures:
         "../outputs/manuscript_figures/figure_1e.svg",
         "../outputs/manuscript_figures/figure_2a.png",
         "../outputs/manuscript_figures/figure_2b.png",
+        "../outputs/manuscript_figures/figure_2d.pdf",
+        "../outputs/manuscript_figures/figure_3a.png",
 
 include: "rules/preprocess.smk"
 include: "rules/calculate_genetic_interaction_scores.smk"

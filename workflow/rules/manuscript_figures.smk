@@ -11,6 +11,7 @@ rule plot_figure_1d:
     script:
         "../scripts/manuscript_figures/plot_figure_1d.R"
 
+
 rule plot_figure_1e:
     input:
         # use the consolidated construct scores file and subset inside the plotting script
@@ -23,6 +24,7 @@ rule plot_figure_1e:
         "../envs/manuscript-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_1e.R"
+
 
 rule plot_figure_2a:
     input:
@@ -39,6 +41,7 @@ rule plot_figure_2a:
     script:
         "../scripts/manuscript_figures/plot_figure_2a.R"
 
+
 rule plot_figure_2b:
     input:
         input_nu_r1="../outputs/gi_scores/screen2023/gene_combination_scores/gene_combination_scores_Nu.OI.R1.tsv",
@@ -53,13 +56,13 @@ rule plot_figure_2b:
     script:
         "../scripts/manuscript_figures/plot_figure_2b.R"
 
+
 rule plot_figure_2d:
     input:
         input_nu="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Nu.OI.Avg.tsv",
-        input_clusters="../outputs/gi_scores/screen2023/clusters/gene_clusters_Nu.OI.Avg.tsv",
-        input_idmap="data/annotations/screen2023_id_to_name_mapping.tsv"
+        input_clusters="../outputs/gi_scores/screen2023/clusters/gene_clusters_Nu.OI.Avg.tsv"
     output:
-        output_figure_2d_svg="../outputs/manuscript_figures/figure_2d.svg"
+        output_figure_2d="../outputs/manuscript_figures/figure_2d.pdf"
     log:
         "../outputs/logs/manuscript_figures/plot_figure_2d.log"
     conda:
@@ -67,12 +70,12 @@ rule plot_figure_2d:
     script:
         "../scripts/manuscript_figures/plot_figure_2d.R"
 
+
 rule plot_figure_3a:
     input:
         input_gamma="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Gamma.OI.Avg.tsv",
         input_tau="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Tau.OI.Avg.tsv",
-        input_nu="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Nu.OI.Avg.tsv",
-        input_idmap="data/annotations/screen2023_id_to_name_mapping.tsv"
+        input_nu="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Nu.OI.Avg.tsv"
     output:
         output_figure_3a="../outputs/manuscript_figures/figure_3a.png"
     log:
@@ -82,14 +85,17 @@ rule plot_figure_3a:
     script:
         "../scripts/manuscript_figures/plot_figure_3a.R"
 
+
 rule plot_figure_3b_negative:
     input:
         input_gamma="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Gamma.OI.Avg.tsv",
         input_tau="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Tau.OI.Avg.tsv",
         input_nu="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Nu.OI.Avg.tsv",
-        input_idmap="data/annotations/screen2023_id_to_name_mapping.tsv"
+        input_clusters="../outputs/gi_scores/screen2023/clusters/gene_clusters_Nu.OI.Avg.tsv"
     output:
-        output_figure_3b="../outputs/manuscript_figures/figure_3b_negative.png"
+        output_figure_3b_gamma_neg="../outputs/manuscript_figures/figure_3b_gamma_negative.png",
+        output_figure_3b_tau_neg="../outputs/manuscript_figures/figure_3b_tau_negative.png",
+        output_figure_3b_nu_neg="../outputs/manuscript_figures/figure_3b_nu_negative.png"
     log:
         "../outputs/logs/manuscript_figures/plot_figure_3b_negative.log"
     conda:
@@ -103,9 +109,11 @@ rule plot_figure_3b_positive:
         input_gamma="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Gamma.OI.Avg.tsv",
         input_tau="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Tau.OI.Avg.tsv",
         input_nu="../outputs/gi_scores/screen2023/discriminant_scores/discriminant_hits_Nu.OI.Avg.tsv",
-        input_idmap="data/annotations/screen2023_id_to_name_mapping.tsv"
+        input_clusters="../outputs/gi_scores/screen2023/clusters/gene_clusters_Nu.OI.Avg.tsv"
     output:
-        output_figure_3b="../outputs/manuscript_figures/figure_3b_positive.png"
+        output_figure_3b_gamma_pos="../outputs/manuscript_figures/figure_3b_gamma_positive.png",
+        output_figure_3b_tau_pos="../outputs/manuscript_figures/figure_3b_tau_positive.png",
+        output_figure_3b_nu_pos="../outputs/manuscript_figures/figure_3b_nu_positive.png"
     log:
         "../outputs/logs/manuscript_figures/plot_figure_3b_positive.log"
     conda:

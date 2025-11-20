@@ -9,76 +9,78 @@ library(seriation)
 library(circlize)
 
 # Load data
-nu.gene.gis <- read_tsv(snakemake@input[["input_nu"]])
-id.map <- read_tsv(snakemake@input[["input_idmap"]])
+nu_gene_gis <- read_tsv(snakemake@input[["input_nu"]])
 clusters <- read_tsv(snakemake@input[["input_clusters"]])
 
 # Rearrange data for heatmap creation
 # Remove interactions involving non-targeting guides
-noncontrol.nu.gene.gis <- nu.gene.gis[!grepl("NTPG_", nu.gene.gis$PseudogeneCombinationName),]
+noncontrol_nu_gene_gis <- nu_gene_gis[!grepl("NTPG_", nu_gene_gis$PseudogeneCombinationName),]
 
 # Make a grid with gene names
-gene.grid <- expand.grid(unique(noncontrol.nu.gene.gis$Pseudogene1), unique(noncontrol.nu.gene.gis$Pseudogene1))
+gene_grid <- expand.grid(unique(noncontrol_nu_gene_gis$Pseudogene1), unique(noncontrol_nu_gene_gis$Pseudogene1))
 # Merge in interaction scores
-gene.grid <- left_join(gene.grid, 
-                       noncontrol.nu.gene.gis, 
+gene_grid <- left_join(gene_grid, 
+                       noncontrol_nu_gene_gis, 
                        by = c("Var1" = "Pseudogene2", "Var2" = "Pseudogene1"))
-gene.grid <- left_join(gene.grid, 
-                       noncontrol.nu.gene.gis, 
+gene_grid <- left_join(gene_grid, 
+                       noncontrol_nu_gene_gis, 
                        by = c("Var1" = "Pseudogene1", "Var2" = "Pseudogene2"))
 # Combine the columns
-gene.grid$Gene.GI <- ifelse(is.na(gene.grid$InteractionScore.x), gene.grid$InteractionScore.y, gene.grid$InteractionScore.x)
-gene.grid$N <- ifelse(is.na(gene.grid$N.x), gene.grid$N.y, gene.grid$N.x)
+
+gene_grid$Gene.GI <- ifelse(is.na(gene_grid$InteractionScore.x), gene_grid$InteractionScore.y, gene_grid$InteractionScore.x)
+gene_grid$N <- ifelse(is.na(gene_grid$N.x), gene_grid$N.y, gene_grid$N.x)
 
 
 # Remove extraneous columns
-gene.grid <- gene.grid[,c("Var1", "Var2", "Gene.GI", "N")]
-gene.grid$Gene.GI <- as.numeric(gene.grid$Gene.GI)
-gene.grid$N <- as.numeric(gene.grid$N)
+
+gene_grid <- gene_grid[,c("Var1", "Var2", "Gene.GI", "N")]
+gene_grid$Gene.GI <- as.numeric(gene_grid$Gene.GI)
+gene_grid$N <- as.numeric(gene_grid$N)
 
 
 # Go from long to wide
-gene.mtx <- pivot_wider(gene.grid[,1:3], names_from = Var2, values_from = Gene.GI)
-gene.mtx <- as.data.frame(gene.mtx)
+gene_mtx <- pivot_wider(gene_grid[,1:3], names_from = Var2, values_from = Gene.GI)
+gene_mtx <- as.data.frame(gene_mtx)
 ### Rename rows
-rownames(gene.mtx) <- gene.mtx$Var1
+rownames(gene_mtx) <- gene_mtx$Var1
 ### Remove redundant column
-gene.mtx <- gene.mtx[,2:ncol(gene.mtx)]
+gene_mtx <- gene_mtx[,2:ncol(gene_mtx)]
 
 # Impute missing values
-gene.mtx <- impute.knn(as.matrix(gene.mtx))$data
+gene_mtx <- impute.knn(as.matrix(gene_mtx))$data
 
 # Get genes in clusters
-to.keep <- unique(c(clusters$gene[clusters$Cluster > 0]))
+to_keep <- unique(c(clusters$gene[clusters$cluster > 0]))
 
-tmp.mtx <- gene.mtx[to.keep,to.keep]
-d <- as.dist(1 - cor(as.matrix(tmp.mtx)))
+tmp_mtx <- gene_mtx[to_keep,to_keep]
+d <- as.dist(1 - cor(as.matrix(tmp_mtx)))
+# Rearrange using OLO algorithm from seriation
 # Rearrange using OLO algorithm from seriation
 o1 <- seriate(d, method = "OLO_average")
 maxmag <- 3.5
 # Define color spectrum ranges
 col_fun <- colorRamp2(c(-1 * maxmag, 0, maxmag), c("#33716B", "white", "#D81B60"))
 
-clust <- data.frame(gene = rownames(tmp.mtx))
-clust <- left_join(clust, clusters[c("gene", "Cluster")])
+clust <- data.frame(gene = rownames(tmp_mtx))
+clust <- left_join(clust, clusters[c("gene", "cluster")])
 
-clust$Cluster[clust$Cluster == 0] <- NA
-clust$gene <- factor(clust$gene, levels = to.keep)
+clust$cluster[clust$cluster == 0] <- NA
+clust$gene <- factor(clust$gene, levels = to_keep)
 clust <- clust[order(clust$gene),]
-clust$Cluster <- factor(as.character(clust$Cluster), 
+clust$cluster <- factor(as.character(clust$cluster), 
                         levels = as.character(1:12))
 
 #row
-# c.both <- rowAnnotation(NuClust = clust$Cluster,
-#                         show_annotation_name = FALSE, 
-#                         col = list(NuClust = setNames(c("#E5E5E5", "#F06FAA", "#4D2D89",
-#                                                         "#9673B3", "#376DB5", "#70BF44", 
-#                                                         "#BA2C32", "#96D2B0", "#924C21",
-#                                                         "#DA6F27", "#009292", "#7DB2E0"), as.character(1:12))), 
-#                         na_col = "white")
+c_both <- rowAnnotation(NuClust = clust$cluster,
+                        show_annotation_name = FALSE, 
+                        col = list(NuClust = setNames(c("#E5E5E5", "#F06FAA", "#4D2D89",
+                                                        "#9673B3", "#376DB5", "#70BF44", 
+                                                        "#BA2C32", "#96D2B0", "#924C21",
+                                                        "#DA6F27", "#009292", "#7DB2E0"), as.character(1:12))), 
+                        na_col = "white")
 
 
-c.both.col <- columnAnnotation(NuClust = clust$Cluster,
+c_both_col <- columnAnnotation(NuClust = clust$cluster,
                                show_annotation_name = FALSE, 
                                show_legend = FALSE,
                                col = list(NuClust = setNames(c("#E5E5E5", "#F06FAA", "#4D2D89",
@@ -87,7 +89,7 @@ c.both.col <- columnAnnotation(NuClust = clust$Cluster,
                                                                "#DA6F27", "#009292", "#7DB2E0"), as.character(1:12))), 
                                na_col = "white")
 
-hm <- Heatmap(t(tmp.mtx), 
+hm <- Heatmap(t(tmp_mtx), 
               rect_gp = gpar(type = "none"), 
               cluster_rows = as.dendrogram(o1[[1]]), 
               cluster_columns = as.dendrogram(o1[[1]]), 
@@ -105,15 +107,15 @@ hm <- Heatmap(t(tmp.mtx),
               },
               col = col_fun,
               name = "GI",
-              left_annotation = c.both, 
-              bottom_annotation = c.both.col,
+              left_annotation = c_both, 
+              bottom_annotation = c_both_col,
               show_column_names = TRUE,
               show_row_names = TRUE,
-              column_names_side = "top",
+              column_names_side = "bottom",
               row_names_gp = gpar(fontsize = 4),
               column_names_gp = gpar(fontsize = 4),
               column_dend_height = unit(2, "cm"))
 
-pdf("figure_2d_heatmap.pdf", width = 10, height = 10)
+pdf(snakemake@output[["output_figure_2d"]], width = 10, height = 10)
 draw(hm)
 dev.off()

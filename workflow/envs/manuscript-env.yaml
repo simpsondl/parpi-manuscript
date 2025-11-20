@@ -14,6 +14,10 @@ dependencies:
   - r-ggplot2=4.0.0
   - r-ggrepel=0.9.6
   - r-wgcna=1.73
+  - r-colorblindness=0.1.9
+  - bioconductor-complexheatmap=2.22.0
+  - r-circlize=0.4.16
+  - r-seriation=1.5.8
   - r-tidyr
   - r-ggextra
   - r-svglite
