@@ -34,7 +34,7 @@ cd parpi-manuscript
 conda env create -f workflow/envs/manuscript-env.yaml
 conda activate parpi_manuscript
 # Or a minimal environment, for use with running by --use-conda
-# conda env create -f workflow/env/minmanuscript-env.yaml
+# conda env create -f workflow/env/min-env.yaml
 # conda activate minmanuscript
 ```
 
