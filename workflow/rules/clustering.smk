@@ -7,7 +7,7 @@ rule cluster_genes:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_gene_clustering.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/clustering-env.yaml"
     params:
         soft_threshold_power=lambda wildcards: config["SOFT_THRESHOLD_POWER"][config["PHENOTYPES_TO_CLUSTER"].index(wildcards.score)]
     script:

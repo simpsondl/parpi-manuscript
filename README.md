@@ -30,12 +30,10 @@ cd parpi-manuscript
 
 ### 2. Set up the environment
 ```bash
-# Create and activate the full conda environment
-conda env create -f workflow/envs/manuscript-env.yaml
-conda activate parpi_manuscript
-# Or a minimal environment, for use with running by --use-conda
-# conda env create -f workflow/env/min-env.yaml
-# conda activate minmanuscript
+# Create and activate a minimal conda environment
+# Solely establishes snakemake installation
+conda env create -f workflow/envs/min-env.yaml
+conda activate minmanuscript
 ```
 
 ### 3. Run the complete analysis

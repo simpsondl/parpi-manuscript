@@ -7,7 +7,7 @@ rule plot_figure_1d:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_1d.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_1d.R"
 
@@ -21,7 +21,7 @@ rule plot_figure_1e:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_1e.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_1e.R"
 
@@ -37,7 +37,7 @@ rule plot_figure_2a:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_2a.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_2a.R"
 
@@ -52,7 +52,7 @@ rule plot_figure_2b:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_2b.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_2b.R"
 
@@ -66,7 +66,7 @@ rule plot_figure_2d:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_2d.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_2d.R"
 
@@ -81,7 +81,7 @@ rule plot_figure_3a:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_3a.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_3a.R"
 
@@ -100,7 +100,7 @@ rule plot_figure_3b_negative:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_3b_negative.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_3b_negative.R"
 
@@ -119,6 +119,6 @@ rule plot_figure_3b_positive:
     log:
         "../outputs/logs/manuscript_figures/plot_figure_3b_positive.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/figures-env.yaml"
     script:
         "../scripts/manuscript_figures/plot_figure_3b_positive.R"

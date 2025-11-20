@@ -11,7 +11,7 @@ rule compute_genetic_interaction_scores:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_compute_genetic_interaction_scores.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/giscores-env.yaml"
     wildcard_constraints:
         score="(Gamma.*|Tau.*)"
     params:
@@ -31,7 +31,7 @@ rule calculate_gene_level_scores:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_calculate_gene_level_scores.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/giscores-env.yaml"
     params:
         score=lambda wildcards: wildcards.score,
         screen=lambda wildcards: wildcards.screen
@@ -49,7 +49,7 @@ rule calculate_discriminant_scores:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_calculate_discriminant_scores.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/giscores-env.yaml"
     params:
         score=lambda wildcards: wildcards.score,
         screen=lambda wildcards: wildcards.screen
@@ -71,7 +71,7 @@ rule calculate_differential_scores:
     log:
         "../outputs/logs/{screen}/{screen}_Nu.{rep}_calculate_differential_scores.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/giscores-env.yaml"
     params:
         rep=lambda wildcards: wildcards.rep,
         screen=lambda wildcards: wildcards.screen
@@ -88,7 +88,7 @@ rule call_hits:
     log:
         "../outputs/logs/{screen}/{screen}_{score}_call_hits.log"
     conda:
-        "../envs/manuscript-env.yaml"
+        "../envs/giscores-env.yaml"
     params:
         threshold=lambda wildcards: config["DIFFERENTIAL_HIT_THRESHOLD"] if str(wildcards.score).startswith("Nu") else config["HIT_THRESHOLD"],
         score=lambda wildcards: wildcards.score,
