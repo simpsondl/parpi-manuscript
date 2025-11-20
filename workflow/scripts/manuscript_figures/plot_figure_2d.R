@@ -9,14 +9,13 @@ library(seriation)
 library(circlize)
 
 # Load data
-nu.gene.gis <- read_tsv("gene_combination_interaction_scores_discriminant_significant_nu_oi_avg.txt")
-id.map <- read_tsv("pseudogenecombination_id_map.txt")
-clusters <- read_tsv("nu_clusters.txt")
+nu.gene.gis <- read_tsv(snakemake@input[["input_nu"]])
+id.map <- read_tsv(snakemake@input[["input_idmap"]])
+clusters <- read_tsv(snakemake@input[["input_clusters"]])
 
 # Rearrange data for heatmap creation
 # Remove interactions involving non-targeting guides
 noncontrol.nu.gene.gis <- nu.gene.gis[!grepl("NTPG_", nu.gene.gis$PseudogeneCombinationName),]
-
 
 # Make a grid with gene names
 gene.grid <- expand.grid(unique(noncontrol.nu.gene.gis$Pseudogene1), unique(noncontrol.nu.gene.gis$Pseudogene1))
@@ -46,21 +45,16 @@ rownames(gene.mtx) <- gene.mtx$Var1
 ### Remove redundant column
 gene.mtx <- gene.mtx[,2:ncol(gene.mtx)]
 
-
 # Impute missing values
 gene.mtx <- impute.knn(as.matrix(gene.mtx))$data
-
 
 # Get genes in clusters
 to.keep <- unique(c(clusters$gene[clusters$Cluster > 0]))
 
-
 tmp.mtx <- gene.mtx[to.keep,to.keep]
 d <- as.dist(1 - cor(as.matrix(tmp.mtx)))
-dt <- as.dist(t(1 - cor(as.matrix(tmp.mtx))))
 # Rearrange using OLO algorithm from seriation
 o1 <- seriate(d, method = "OLO_average")
-o2 <- seriate(dt, method = "GW_average")
 maxmag <- 3.5
 # Define color spectrum ranges
 col_fun <- colorRamp2(c(-1 * maxmag, 0, maxmag), c("#33716B", "white", "#D81B60"))
@@ -75,13 +69,13 @@ clust$Cluster <- factor(as.character(clust$Cluster),
                         levels = as.character(1:12))
 
 #row
-c.both <- rowAnnotation(NuClust = clust$Cluster,
-                        show_annotation_name = FALSE, 
-                        col = list(NuClust = setNames(c("#E5E5E5", "#F06FAA", "#4D2D89",
-                                                        "#9673B3", "#376DB5", "#70BF44", 
-                                                        "#BA2C32", "#96D2B0", "#924C21",
-                                                        "#DA6F27", "#009292", "#7DB2E0"), as.character(1:12))), 
-                        na_col = "white")
+# c.both <- rowAnnotation(NuClust = clust$Cluster,
+#                         show_annotation_name = FALSE, 
+#                         col = list(NuClust = setNames(c("#E5E5E5", "#F06FAA", "#4D2D89",
+#                                                         "#9673B3", "#376DB5", "#70BF44", 
+#                                                         "#BA2C32", "#96D2B0", "#924C21",
+#                                                         "#DA6F27", "#009292", "#7DB2E0"), as.character(1:12))), 
+#                         na_col = "white")
 
 
 c.both.col <- columnAnnotation(NuClust = clust$Cluster,
@@ -113,16 +107,13 @@ hm <- Heatmap(t(tmp.mtx),
               name = "GI",
               left_annotation = c.both, 
               bottom_annotation = c.both.col,
-              show_column_names = FALSE,
-              show_row_names = FALSE,
+              show_column_names = TRUE,
+              show_row_names = TRUE,
               column_names_side = "top",
               row_names_gp = gpar(fontsize = 4),
               column_names_gp = gpar(fontsize = 4),
               column_dend_height = unit(2, "cm"))
 
 pdf("figure_2d_heatmap.pdf", width = 10, height = 10)
-draw(hm)
-dev.off()
-svg("figure_2d_heatmap.svg", width = 10, height = 10)
 draw(hm)
 dev.off()

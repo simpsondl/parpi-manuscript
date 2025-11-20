@@ -27,54 +27,9 @@ tmp_df <- rbind(gc_nu[gc_nu$Category == "X+Y", ],
 
 tmp_df$CatSig <- factor(tmp_df$CatSig, levels = c("X+Y", "X+NT", "NT+NT", "TRUE"))
 
-# Sample subset for plotting labeled pngs
-tmp_df2 <- tmp_df[sample(nrow(tmp_df), 10000), ] 
-tmp_df2 <- rbind(tmp_df2,
-                 tmp_df[tmp_df$InteractionScore.R1 == min(tmp_df$InteractionScore.R1), ])
-tmp_df2 <- rbind(tmp_df2,
-                 tmp_df[tmp_df$InteractionScore.R2 == min(tmp_df$InteractionScore.R2), ])
-tmp_df2 <- rbind(tmp_df2,
-                 tmp_df[tmp_df$InteractionScore.R1 == max(tmp_df$InteractionScore.R1), ])
-tmp_df2 <- rbind(tmp_df2,
-                 tmp_df[tmp_df$InteractionScore.R2 == max(tmp_df$InteractionScore.R2), ])
-# Check that the sampling chose both categories
-stopifnot(length(table(tmp_df2$CatSig)) == 4)
 
-# Label-free theme
-nolabel_theme <-   theme(axis.text.x = element_blank(),
-                         axis.title.x = element_blank(),
-                         axis.text.y = element_blank(),
-                         axis.title.y = element_blank(),
-                         panel.grid.major = element_blank(), 
-                         panel.grid.minor = element_blank(),
-                         panel.grid = element_blank(),
-                         panel.border = element_blank(),
-                         axis.line = element_line(),
-                         axis.ticks.length = unit(.2, "cm"),
-                         legend.position = "none")
-nolabel_axes <- list(xlab(""), ylab(""), ggtitle("")) 
-
-
-# No labels for flat PNG - FIGURE 2C
-p2c <- ggplot(tmp_df, aes(InteractionScore.R1, InteractionScore.R2, color = CatSig)) + 
-  geom_hline(yintercept = 0, alpha = .5) +
-  geom_vline(xintercept = 0, alpha = .5) +
-  geom_point(size = .35, alpha = .6, pch = 16) +
-  scale_color_manual(values = c("#999999", "#abddde", "#046c9a", "#BB5566")) +
-  theme_bw() + 
-  nolabel_theme +
-  nolabel_axes +
-  coord_fixed() +
-  scale_x_continuous(breaks = seq(-8, 12, 4)) +
-  scale_y_continuous(breaks = seq(-8, 12, 4))
-
-
-# Add marginal histograms - FIGURE 2C
-p2ch <- ggMarginal(p2c, groupColour = TRUE, groupFill = FALSE)
-
-
-# labels for SVG - FIGURE 2C
-p2cl <- ggplot(tmp_df, aes(InteractionScore.R1, InteractionScore.R2, color = CatSig)) + 
+# Plot - FIGURE 2A
+p2a <- ggplot(tmp_df, aes(InteractionScore.R1, InteractionScore.R2, color = CatSig)) + 
   geom_hline(yintercept = 0, alpha = .5) +
   geom_vline(xintercept = 0, alpha = .5) +
   geom_point(size = 1, alpha = .3, pch = 16) +
@@ -112,8 +67,10 @@ p2cl <- ggplot(tmp_df, aes(InteractionScore.R1, InteractionScore.R2, color = Cat
   scale_x_continuous(breaks = seq(-8, 12, 4)) +
   scale_y_continuous(breaks = seq(-8, 12, 4))
 
+# Add marginal histograms - FIGURE 2A
+p2ah <- ggMarginal(p2a, groupColour = TRUE, groupFill = FALSE)
+
+
 # Save plots
 ggsave(snakemake@output[["output_figure_2a"]], 
-       p2ch, device = "png", width = 5, height = 5, dpi = 300)
-ggsave(snakemake@output[["output_figure_2a_labels"]], 
-       p2cl, device = "png", width = 6, height = 6, dpi = 300)
+       p2ah, device = "png", width = 5, height = 5, dpi = 300)
