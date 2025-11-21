@@ -1,15 +1,8 @@
 cff-version: 1.2.0
-title: "GI Nexus v1.0.0-manuscript"
-version: 1.8.0
+title: "GI Nexus v1.0.0-beta"
 license: "CC BY 4.0"
-type: software
 abstract: "Reproducible analysis pipeline accompanying the manuscript 'Mapping the Genetic Interaction Network of PARP inhibitor Response'."
-message: "If you use this software, please cite it as below."
 authors:
-  - given-names: Danny
-    family-names: Simpson
-    affiliation: Princeton University
-keywords:
-  - snakemake
-  - crispr
-  - genetic-interactions
+  - family-names: Simpson
+    given-names: Danny
+date-released: 2025-11-20
