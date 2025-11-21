@@ -59,7 +59,7 @@ snakemake --use-conda -n generate_manuscript_figures
 snakemake --use-conda --cores 6 generate_manuscript_figures
 ```
 
-This part of the pipeline uses bioconductor packages, which can not be accessed through conda on Windows. It is still possible to use the pipeline on Windows by establishing your own environment first and installing needed packages manually, then adjusting `manuscript_figures.smk` appropriately. All used packages are available on Windows.
+This part of the pipeline uses bioconductor packages, which can not be accessed through conda on Windows. It is still possible to use the pipeline on Windows by establishing your own environment first and installing needed packages manually, then running `generate_manuscript_figures` without the `--use-conda` flag. All used R packages are available on Windows.
 
 Please note that the figure scripts output raw versions of figures which were then paneled in Adobe Illustrator. Label and text sizes, text placement, and legend placement were frequently changed in post-processing to accommodate figure structure.
 
