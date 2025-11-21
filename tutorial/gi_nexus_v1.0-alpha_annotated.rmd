@@ -1,0 +1,863 @@
+---
+title: "An annotated guide to processing genetic interaction screens"
+author: "Danny Simpson"
+date: "2024-11-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This document contains a walkthrough of processing a genetic interaction screen, looking at the individual functions underlying the GI Nexus pipeline. The code presented here generates the same outputs as the full pipeline but is not optimized. The information provided here is for reference, but could feasibly be adapted to run on new datasets. Some steps or stages are commented out for compilation, but users can adjust as desired. 
+
+## Generating counts
+
+The first step to calling genetic interaction scores from a dual-sgRNA screen is to get counts for each sgRNA pair. This can be done through numerous methods, and this pipeline assumes that you have are starting with a counts matrix already prepared. Ensure that sgRNA pairs which were not observed are listed with count 0. 
+
+Once counts have been generated for each arm of the screen and replicate, combine them into a single file that also contains meta information about each sgRNA pair. Suggested meta information includes the sgRNA pair itself (ordered, so dual-sgRNA A-B is different from dual-sgRNA B-A), the gene each sgRNA in the pair targets, pseudogene assignments for non-targeting sgRNAs (if desired), the category of the sgRNA pair (e.g., NT+NT for pairs with two non-targeting sgRNAs, X+NT for a targeting and non-targeting sgRNA pair, X+X for sgRNA pairs that target the same gene, and X+Y for sgRNA pairs targeting different genes), the "orientation" of an sgRNA pair (AB or BA, depending on if the alphabetically first sgRNA appears in the first position), a column describing whether sgRNAs in both positions are the identical, and unique identifiers for each construct, sgRNA pair, gene pair, and pseudogene pair (non-targeting sgRNAs randomly paired into genes). 
+
+
+```{r rf}
+library(readr)
+library(dplyr)
+
+# This file contains all counts with meta information
+input_counts_path <- "../manuscript_data/counts/screen2023_raw_counts.zip"
+zlist <- utils::unzip(input_counts_path, list = TRUE)
+target_name <- zlist$Name[grepl("_raw_counts\\.tsv$", zlist$Name, ignore.case = TRUE)]
+counts <- read_tsv(unz(input_counts_path, target_name[1]), show_col_types = FALSE)
+head(counts)
+
+# It's helpful to create a "map" of gene pairs with their identifiers
+idmap <- read_tsv("../manuscript_data/annotations/pseudogenecombination_id_map.txt")
+```
+
+## Generating phenotypes
+
+Once counts have been aggregated, phenotypes can be determined from them. First, we identify individual sgRNAs which are serially underenriched in the dataset, with median count across all combinations <= 35. These sgRNAs will not generate good models for calling interaction scores, as they have limited phenotypic range. Next, we remove constructs which have a low count at T0 (<= 50). These constructs could be missing due to library construction, and low initial counts limit the strength of phenotypes which can be observed.
+
+Functions for performing these two filters are below. 
+
+```{r helpers}
+### Function for identifying individual sgRNAs which are poorly represented
+### in either position A or position B at T0
+### Inputs:
+### ### counts - raw count df, import from file
+### ### conds - condition df, maps sample and replicate information to column names
+### ### filtersamp - which arm of experiment to filter
+### ### filterthresh - minimum median representation across all constructs/replicates
+### Outputs:
+### ### vector with sgRNA ids to with mean median representation below threshold
+filt_low_representation <- function(counts, conds, filtersamp, filterthresh = 30){
+  # For each sgRNA in each position, get median count across all matching constructs
+  # Expected output: 2 df with rows equal to number of sgRNAs and and 6 measurements across arms/replicates
+  med.pos1 <- counts %>% group_by(FirstPosition) %>% summarise(across(conds$Colname, median))
+  med.pos2 <- counts %>% group_by(SecondPosition) %>% summarise(across(conds$Colname, median))
+  # For each sgRNA in each position, calculate mean median coverage per arm
+  # Expected output: 2 df with rows equal to number of sgRNAs and 3 measurements across arms
+  mean.pos1 <- as.data.frame(lapply(unique(conds$Samplename), 
+                                    function(i) apply(med.pos1[,colnames(med.pos1) %in% 
+                                                                 conds$Colname[conds$Samplename == i]], 
+                                                      1, mean)))
+  mean.pos2 <- as.data.frame(lapply(unique(conds$Samplename), 
+                                    function(i) apply(med.pos2[,colnames(med.pos2) %in% 
+                                                                 conds$Colname[conds$Samplename == i]], 
+                                                      1, mean)))
+  # Fix names from lapply
+  colnames(mean.pos1) <- unique(conds$Samplename)
+  colnames(mean.pos2) <- unique(conds$Samplename)
+  # Set for return, only need pos1 since indexing is identical
+  rownames(mean.pos1) <- med.pos1$FirstPosition
+  # Return sgRNA ids which have mean median representation below threshold
+  return(rownames(mean.pos1[mean.pos1[,filtersamp] <= filterthresh | mean.pos2[,filtersamp] <= filterthresh,]))
+}
+
+### Function for identifying individual sgRNA combinations which are poorly represented
+### Inputs:
+### ### counts - raw count df, import from file
+### ### conds - condition df, maps sample and replicate information to column names
+### ### filtersamp - which arm of experiment to filter
+### ### filterthresh - minimum median representation across all constructs/replicates
+### Outputs:
+### ### vector with sgRNA combination ids to with representation below threshold
+filt_combinations <- function(counts, conds, filtersamp, filterthresh){
+  # Get column indices corresponding to arms to filter
+  idx <- which(colnames(counts) %in% conds$Colname[conds$Samplename == filtersamp])
+  # Create vector where nonzero entry corresponds to a count below threshold in a relevant arm
+  tmp <- rowSums(counts[,idx] <= filterthresh)
+  # Return guidecombinationids for sgRNA combinations to be filtered
+  return(counts$ConstructID[which(tmp != 0)])
+}
+```
+
+
+The above functions also require a "condition dataframe", which maps column names in the counts dataframe to screen arms and replicates. The sample code below demonstrates the expected structure.
+
+```{r filts}
+# Define conditions in each arm
+cond.df <- data.frame(Colname = colnames(counts[,14:19]),
+                      Samplename = gsub("\\.R.*", "", colnames(counts[,14:19])),
+                      Replicate = gsub(".*\\.","", colnames(counts[,14:19])))
+
+print(cond.df)
+```
+
+Once necessary components have been made, apply filters, keeping track of why individual constructs were filtered. 
+
+```{r appfilt}
+# Identify individual sgRNAs which have low representation at T0 (med <= 35)
+sgrna.filt <- filt_low_representation(counts = counts, 
+                                      conds = cond.df, 
+                                      filtersamp = "T0", 
+                                      filterthresh = 35)
+
+# Identify sgRNA combinations with low representation at T0 (count <= 50)
+combination.filt <- filt_combinations(counts = counts, 
+                                      conds = cond.df, 
+                                      filtersamp = "T0", 
+                                      filterthresh = 50)
+
+# Keep track of filtered combinations and reason why
+# These are the metadata columns, adjust if your data is different
+to.filt <- counts[,1:13]
+to.filt$Flag <- NA
+
+# Flag combinations involving identified sgRNAs that have low median representation in either position
+to.filt$Flag[to.filt$FirstPosition %in% sgrna.filt | to.filt$SecondPosition %in% sgrna.filt] <- 
+  "Low median representation at T0"
+# Flag individual combinations which have low representation at T0, 
+# do not flag constructs which were previously removed
+to.filt$Flag[to.filt$ConstructID %in% combination.filt & is.na(to.filt$Flag)] <- "Low representation at T0"
+```
+
+After filtering, three sets of phenotypes can be calculated using the below functions. The first function calculates phenotypes for each sgRNA construct, the second for each sgRNA pair (orientation-independent), and the third for each individual sgRNA (by using non-targeting controls).
+
+Gamma phenotypes describe the relationship between the reference condition and T0, tau phenotypes describe the treated condition compared to T0, and rho phenotypes are defined as the treated condition relative to the reference condition. These functions will need to be adjusted to reflect specific column names that are used in your data.
+
+Note that the first function adjusts phenotypes by the population doublings observed in each arm and replicate. These doublings should be provided as a vector in the same order as your counts dataframe. For example, if the DMSO.R1 arm column appears first in your counts dataframe, then the number of population doublings for DMSO.R1 should also be first in the population doublings vector. 
+
+```{r phenofunc}
+### Function for calculating individual sgRNA combination phenotypes
+### Inputs:
+### ### counts - raw count df, import from file
+### ### conds - condition df, maps sample and replicate information to column names
+### ### pseudocount - pseudocount to add to all raw count values, default 10
+### ### normalize - normalize phenotypes to non-targeting controls and population doublings, default TRUE
+### ### doublings - vector containing total population doublings in the following order:
+### ### ### DMSO Replicate 1
+### ### ### DMSO Replicate 2
+### ### ### Niraparib Replicate 1
+### ### ### Niraparib Replicate 2
+### Outputs:
+### ### df containing gamma, tau, and rho phenotypes for all combinations present
+calculate_phenotypes <- function(counts, conds, pseudocount = 10, normalize = TRUE, doublings){
+  pseudo <- counts[,colnames(counts) %in% conds$Colname] + pseudocount
+  fracs <- sweep(pseudo, 2, colSums(pseudo), FUN = "/")
+  phenos <- data.frame(Gamma.R1 = log2(fracs$DMSO.R1/fracs$T0.R1),
+                       Gamma.R2 = log2(fracs$DMSO.R2/fracs$T0.R2),
+                       Tau.R1 = log2(fracs$NIRAP.R1/fracs$T0.R1),
+                       Tau.R2 = log2(fracs$NIRAP.R2/fracs$T0.R2),
+                       Rho.R1 = log2(fracs$NIRAP.R1/fracs$DMSO.R1),
+                       Rho.R2 = log2(fracs$NIRAP.R2/fracs$DMSO.R2))
+  phenos <- cbind(counts[,1:13], phenos)
+  
+  if(normalize){
+    nt.gamma.r1 <- median(phenos$Gamma.R1[phenos$Category == "NT+NT"])
+    nt.gamma.r2 <- median(phenos$Gamma.R2[phenos$Category == "NT+NT"])
+    nt.tau.r1 <- median(phenos$Tau.R1[phenos$Category == "NT+NT"])
+    nt.tau.r2 <- median(phenos$Tau.R2[phenos$Category == "NT+NT"])
+    nt.rho.r1 <- median(phenos$Rho.R1[phenos$Category == "NT+NT"])
+    nt.rho.r2 <- median(phenos$Rho.R2[phenos$Category == "NT+NT"])
+    
+    phenos$Gamma.R1 <- (phenos$Gamma.R1 - nt.gamma.r1)/doublings[1]
+    phenos$Gamma.R2 <- (phenos$Gamma.R2 - nt.gamma.r2)/doublings[2]
+    phenos$Tau.R1 <- (phenos$Tau.R1 - nt.tau.r1)/doublings[3]
+    phenos$Tau.R2 <- (phenos$Tau.R2 - nt.tau.r2)/doublings[4]
+    phenos$Rho.R1 <- (phenos$Rho.R1 - nt.rho.r1)/(doublings[1]-doublings[3])
+    phenos$Rho.R2 <- (phenos$Rho.R2 - nt.rho.r2)/(doublings[2]-doublings[4])
+  }
+  
+  phenos$Gamma.Avg <- rowMeans(phenos[,c("Gamma.R1", "Gamma.R2")])
+  phenos$Tau.Avg <- rowMeans(phenos[,c("Tau.R1", "Tau.R2")])
+  phenos$Rho.Avg <- rowMeans(phenos[,c("Rho.R1", "Rho.R2")])
+
+  return(phenos[,c(1:15,20,16,17,21,18,19,22)])
+}
+
+### Function for calculating orientation independent, averaged sgRNA combination phenotypes
+### Inputs:
+### ### phenos - output from calculate_phenotypes function, OR a df containing columns:
+### ### ### Gamma.R1, Gamma.R2
+### ### ### Tau.R1, Tau.R2
+### ### ### GuideCombinationID with IDs beginning with sgc_
+### Outputs:
+### ### df containing orientation-independent phenotypes for all replicates and avg replicate
+calculate_averaged_phenotypes <- function(phenos){
+  orind <- phenos %>% group_by(GuideCombinationID) %>% summarise(Gamma.OI.R1 = mean(Gamma.R1),
+                                                                 Gamma.OI.R2 = mean(Gamma.R2),
+                                                                 Gamma.OI.Avg = mean(Gamma.Avg),
+                                                                 Tau.OI.R1 = mean(Tau.R1),
+                                                                 Tau.OI.R2 = mean(Tau.R2),
+                                                                 Tau.OI.Avg = mean(Tau.Avg),
+                                                                 Rho.OI.R1 = mean(Rho.R1),
+                                                                 Rho.OI.R2 = mean(Rho.R2),
+                                                                 Rho.OI.Avg = mean(Rho.Avg),
+                                                                 N = n())
+  orind <- orind[order(as.numeric(gsub("sgc_","",orind$GuideCombinationID))),]
+  return(orind)
+}
+
+### Function for calculating phenotypes for individual sgRNAs using non-targeting guides
+### Inputs:
+### ### phenos - output from calculate_phenotypes function
+### Outputs:
+### ### df containing single sgRNA phenotypes by replicate
+calculate_single_sgRNA_phenotypes <- function(phenos){
+  # Create dataframe for saving results
+  single.pheno <- data.frame("sgRNA.ID" = unique(c(phenos$FirstPosition, phenos$SecondPosition)), 
+                             "Gamma.OI.R1" = 0, 
+                             "Gamma.OI.R2" = 0,
+                             "Gamma.OI.Avg" = 0,
+                             "Tau.OI.R1" = 0,
+                             "Tau.OI.R2" = 0,
+                             "Tau.OI.Avg" = 0,
+                             "Rho.OI.R1" = 0,
+                             "Rho.OI.R2" = 0,
+                             "Rho.OI.Avg" = 0,
+                             "N" = 0)
+  
+  for(i in 1:nrow(single.pheno)){
+    # Handle non-targeting case
+    if(grepl("non-targeting",single.pheno$sgRNA.ID[i])){
+      # Extract all non-targeting guide combinations with desired non-targeting guide in position A or B
+      # If this is not handled explicitly, will aggregate all NT guides into a glob
+      tmp <- phenos[(phenos$FirstPosition == single.pheno$sgRNA.ID[i] &
+                                phenos$SecondPosition %in% unique(phenos$FirstPosition[phenos$Category == "NT+NT"])) | 
+                    (phenos$SecondPosition == single.pheno$sgRNA.ID[i] &
+                                phenos$FirstPosition %in% unique(phenos$FirstPosition[phenos$Category == "NT+NT"])),]
+      single.pheno[i,2:10] <- apply(tmp[,14:22], 2, mean)
+      single.pheno$N[i] <- nrow(tmp)
+    }
+    # Handle targeting case
+    else {
+      # Extract all combinations with desired targeting guide in position A or B and non-targeting guide in other
+      tmp <- phenos[(phenos$FirstPosition == single.pheno$sgRNA.ID[i] | 
+                       phenos$SecondPosition == single.pheno$sgRNA.ID[i]) & 
+                (phenos$FirstPosition %in% unique(phenos$FirstPosition[phenos$Category == "NT+NT"]) | 
+                   phenos$SecondPosition %in% unique(phenos$FirstPosition[phenos$Category == "NT+NT"])),]
+      single.pheno[i,2:10] <- apply(tmp[,14:22], 2, mean)
+      single.pheno$N[i] <- nrow(tmp)
+    }
+  }
+  return(single.pheno)
+}
+```
+
+Calculate phenotypes. First calculate phenotypes for each non-filtered sgRNA construct, then calculate phenotypes are sgRNA pairs (orientation-independent), and finally calculate phenotypes for individual sgRNAs.
+
+```{r pheno}
+# Calculate phenotypes for non-flagged constructs
+raw_phenotypes <- calculate_phenotypes(counts = counts[counts$ConstructID %in% to.filt$ConstructID[is.na(to.filt$Flag)],], 
+                                   conds = cond.df,
+                                   pseudocount = 10,
+                                   normalize = TRUE,
+                                   doublings = c(8.04, 7.98, 5.40, 4.98))
+
+head(raw_phenotypes)
+
+# Calculate orientation independent, averaged phenotypes
+orind.phenotypes <- calculate_averaged_phenotypes(phenos = raw_phenotypes)
+
+head(orind.phenotypes)
+
+# Calculate single sgRNA phenotypes
+single.pheno <- calculate_single_sgRNA_phenotypes(raw_phenotypes)
+
+head(single.pheno)
+```
+
+Once phenotypes have all been calculated, they can be saved.
+
+```{r save}
+# Make screen directory
+dir.create("manuscript_data/screen2023", showWarnings = FALSE)
+
+# Save phenotype tables
+write_tsv(raw_phenotypes, "../manuscript_data/Screen2023/screen2023_raw_phenotypes.txt")
+write_tsv(orind.phenotypes, "../manuscript_data/Screen2023/screen2023_orientation_averaged_phenotypes.txt")
+write_tsv(single.pheno, "../manuscript_data/Screen2023/screen2023_single_sgRNA_phenotypes.txt")
+write_tsv(to.filt, "../manuscript_data/Screen2023/screen2023_guide_combination_filter_flags.txt")
+```
+
+## Calculating genetic interaction scores
+
+Once phenotypes have been calculated, it is time to call genetic interaction (GI) scores. This process happens by building a model for each "query" sgRNA, with individual sgRNA phenotypes appearing on the x-axis and combinatorial phenotypes with the query sgRNA appearing on the y-axis. If this model is effectively a flat line, with all combinatorial phenotypes being roughly the same regardless of individual sgRNA phenotype, then the model will produce non-informative GI scores. We identify those sgRNAs first by setting a threshold for the correlation between individual and combinatorial phenotypes, and do not build models for them.
+
+The function below performs this task.
+
+```{r nocorfilt}
+### Function for calculating correlations between single and combinatorial phenotypes for all sgRNAs
+### This function only considers orientation-indepedent, replicate-averaged phenotypes but can be
+### easily adjusted to expand to other phenotypes previously calculated
+### Inputs:
+### ### combphenos - output from calculate_phenotypes function
+### ### singlephenos - output from calculate_single_sgRNA_phenotypes
+### ### filterthresh - the minimum correlation to not flag an sgRNA for filtering, default 0.25
+### Outputs:
+### ### list containing four elements, in order:
+### ### ### df with all calculated correlations
+### ### ### sgRNA ids below threshold, gamma phenotypes
+### ### ### sgRNA ids below threshold, tau phenotypes
+### ### ### sgRNA ids below threshold, rho phenotypes
+filt_nocorrelation <- function(combphenos, singlephenos, filterthresh = 0.25){
+  cors <- data.frame(sgRNA.ID = singlephenos$sgRNA.ID,
+                     Gamma.OI.Correlation = NA,
+                     Tau.OI.Correlation = NA,
+                     Rho.OI.Correlation = NA)
+  
+  for(i in singlephenos$sgRNA.ID){
+    tmp <- combphenos[combphenos$SecondPosition == i,c(colnames(combphenos)[1:13], 
+                                                      "Gamma.OI.Avg", "Tau.OI.Avg", "Rho.OI.Avg")]
+    tmp <- merge(tmp, singlephenos[,c("sgRNA.ID", "Gamma.OI.Avg", "Tau.OI.Avg", "Rho.OI.Avg")],
+                 by.x = "FirstPosition", by.y = "sgRNA.ID")
+    cors$Gamma.OI.Correlation[cors$sgRNA.ID == i] <- cor(tmp[,"Gamma.OI.Avg.x"], tmp[,"Gamma.OI.Avg.y"])
+    cors$Tau.OI.Correlation[cors$sgRNA.ID == i] <- cor(tmp[,"Tau.OI.Avg.x"], tmp[,"Tau.OI.Avg.y"])
+    cors$Rho.OI.Correlation[cors$sgRNA.ID == i] <- cor(tmp[,"Rho.OI.Avg.x"], tmp[,"Rho.OI.Avg.y"])
+  }
+  
+  return(list(cors, 
+              cors$sgRNA.ID[cors$Gamma.OI.Correlation < filterthresh], 
+              cors$sgRNA.ID[cors$Tau.OI.Correlation < filterthresh],
+              cors$sgRNA.ID[cors$Rho.OI.Correlation < filterthresh]))
+}
+```
+
+```{r gi}
+# Merge in orientation-independent phenotypes for use
+raw_phenotypes <- left_join(raw_phenotypes, orind.phenotypes[,1:10])
+
+# Identify single sgRNAs whose combinatorial and single phenotypes do not correlate
+nocorr.filt <- filt_nocorrelation(combphenos = raw_phenotypes, 
+                                  singlephenos = single.pheno,
+                                  filterthresh = .25)
+
+# Pull out filtered phenotypes for interaction scores
+# Assumption: guides which fail the correlation filter in the gamma condition are likely to
+# produce unreliable scores in the tau condition as well and should be filtered from both. The 
+# converse is not true--guides which fail the correlation filter in the tau condition can be 
+# reflective of the underlying biology, for example, knockdown of a gene causing extreme 
+# sensitization to drug treatment so that the dynamic range of observed phenotypes is minimal.
+# sgRNAs which fail the tau correlation filter should not be filtered from the gamma condition.
+phenos.filt.gamma <- raw_phenotypes[!(raw_phenotypes$FirstPosition %in% nocorr.filt[[2]]) &
+                                  !(raw_phenotypes$SecondPosition %in% nocorr.filt[[2]]),]
+phenos.filt.tau <- raw_phenotypes[!(raw_phenotypes$FirstPosition %in% nocorr.filt[[2]]) &
+                                  !(raw_phenotypes$SecondPosition %in% nocorr.filt[[2]]) &  
+                                  !(raw_phenotypes$FirstPosition %in% nocorr.filt[[3]]) &
+                                  !(raw_phenotypes$SecondPosition %in% nocorr.filt[[3]]),]
+phenos.filt.rho <- raw_phenotypes[!(raw_phenotypes$FirstPosition %in% nocorr.filt[[2]]) &
+                                  !(raw_phenotypes$SecondPosition %in% nocorr.filt[[2]]) &  
+                                  !(raw_phenotypes$FirstPosition %in% nocorr.filt[[3]]) &
+                                  !(raw_phenotypes$SecondPosition %in% nocorr.filt[[3]]) &
+                                  !(raw_phenotypes$FirstPosition %in% nocorr.filt[[4]]) &
+                                  !(raw_phenotypes$SecondPosition %in% nocorr.filt[[4]]),]
+single.pheno.filt.gamma <- single.pheno[!(single.pheno$sgRNA.ID %in% nocorr.filt[[2]]),]
+single.pheno.filt.tau <- single.pheno[!(single.pheno$sgRNA.ID %in% nocorr.filt[[2]]) &
+                                    !(single.pheno$sgRNA.ID %in% nocorr.filt[[3]]),]
+single.pheno.filt.rho <- single.pheno[!(single.pheno$sgRNA.ID %in% nocorr.filt[[2]]) &
+                                    !(single.pheno$sgRNA.ID %in% nocorr.filt[[3]]) &
+                                    !(single.pheno$sgRNA.ID %in% nocorr.filt[[4]]),]
+
+
+# Flag filtered constructs that were not previously filtered
+to.filt$Flag[(to.filt$FirstPosition %in% nocorr.filt[[2]] | 
+                to.filt$SecondPosition %in% nocorr.filt[[2]]) &
+             is.na(to.filt$Flag)] <- "No correlation - Gamma phenotype - no gGI or tGI scores"
+# If an sgRNA was filtered due to having no gamma correlation, that sgRNA will not be flagged if
+# it also had no tau correlation.
+to.filt$Flag[(to.filt$FirstPosition %in% nocorr.filt[[3]] | 
+                to.filt$SecondPosition %in% nocorr.filt[[3]]) &
+             is.na(to.filt$Flag)] <- "No correlation - Tau phenotype - no tGI scores"
+
+# Save flags to file
+write_tsv(to.filt, "../manuscript_data/Screen2023/screen2023_all_flags_orind.txt")
+```
+
+Once sgRNAs that will have models built have been identified, it is time to build models and call genetic interaction scores. We have provided one main function to do this, and two helper functions to organize results.
+
+```{r gifuncs}
+library(tidyr)
+library(broom)
+
+### Function for calculating interaction scores
+### Inputs:
+### ### query - sgRNA ID to calculate GI scores for
+### ### singlepheno.df - filtered output from calculate_single_sgRNA_phenotypes and filt_nocorrelation
+### ### pairpheno.df - filtered output from calculate_phenotypes and filt_nocorrelation
+### ### phenocol - column name that contains the phenotypes to calculate GI scores from
+### Outputs:
+### ### list containing three elements, in order:
+### ### ### df with all called interaction scores
+### ### ### a vector containing expected GI scores determined from the model
+### ### ### the model that was built
+compute_gis <- function(query, singlepheno.df, pairpheno.df, phenocol){
+  ### Get the single sgRNA phenotypes
+  tmp.data <- data.frame(query = query, 
+                         sgRNA.id = singlepheno.df$sgRNA.ID, 
+                         single = singlepheno.df[,phenocol])
+  colnames(tmp.data)[3] <- "single"
+  ### Merge single with interaction phenotypes
+  tmp.data.merge <- merge(tmp.data, pairpheno.df[pairpheno.df$SecondPosition == query, 
+                                                 c("ConstructID",  "GuideCombinationID", "Identical",
+                                                   "PseudogeneCombinationID", "Orientation", 
+                                                   "GeneCombinationID", "Category", "FirstPosition",phenocol)], 
+                          by.x = "sgRNA.id", by.y = "FirstPosition", all.x = TRUE)
+  
+  ### Identify control combinations
+  tmp.data.merge$Control <- grepl("non-targeting",tmp.data.merge$sgRNA.id)
+  
+  ### Remove any missing information
+  tmp.data.merge <- tmp.data.merge[!is.na(tmp.data.merge[,phenocol]),]
+  
+  if(nrow(tmp.data.merge) == 0){
+    return(NA)
+  }
+  try({
+    ### Fit the model
+    lm.fit <- lm(as.formula(paste0(phenocol," ~ single + I(single^2)")), data = tmp.data.merge)
+    
+    ### Generate points for plotting the fit
+    single.pred <- seq(-.35, .05,.01)
+    pair.pred <- predict(lm.fit, list(single = single.pred))
+    
+    ### Define interaction score as observed - expected
+    tmp.data.merge$Expected <- predict(lm.fit, list(single = tmp.data.merge$single))
+    tmp.data.merge$GI <- lm.fit$residuals
+    ### z-standardize GIs to negative controls
+    tmp.data.merge$GI.z <- (tmp.data.merge$GI)/sd(tmp.data.merge$GI[tmp.data.merge$Control])
+    
+    ### Order dataframe
+    tmp.data.merge <- tmp.data.merge[order(tmp.data.merge$GI),c("ConstructID", "GuideCombinationID", 
+                                                                "PseudogeneCombinationID", "GeneCombinationID", 
+                                                                "Orientation", "Identical", "Category", "Control",
+                                                                "sgRNA.id", "query", "single", phenocol, "Expected",
+                                                                "GI", "GI.z")]
+    
+    ### Want to label strongest 10 interactions [both buffering and synthetic lethal]
+    n <- nrow(tmp.data.merge)
+    tmp.data.merge$lb <- c(gsub("_.*","",tmp.data.merge$sgRNA.id[1:(10)]),
+                           rep("",n-20),
+                           gsub("_.*","",tmp.data.merge$sgRNA.id[(n-9):n]))
+    
+  }, silent = TRUE)
+  
+  return(list(tmp.data.merge, pair.pred, lm.fit))
+}
+
+### Function for cleanly saving results from compute_gis - used to establish save df's
+### Inputs:
+### ### gis - output from calculate_gis function
+### Outputs:
+### ### list containing three elements, in order:
+### ### ### df with gi scores
+### ### ### df with model coefficients
+### ### ### df with model statistics
+create_interaction_result_df <- function(gis){
+  all.gis <- gis[[1]]
+  ests <- data.frame(sgRNA.ID = i, tidy(gis[[3]]))
+  stats <- data.frame(sgRNA.ID = i,glance(gis[[3]]))
+  
+  return(list(all.gis, ests, stats))
+}
+
+### Function for cleanly saving results from compute_gis - used after create_interaction_result_df
+### Note: this function is fairly inefficient; making dataframes of the appropriate size and 
+### populating them over time is preferable
+### ### gis - output from calculate_gis function
+### ### prev - output from either create_interaction_result_df or update_interaction_result_df
+### Outputs:
+### ### list containing three elements, in order:
+### ### ### df with gi scores
+### ### ### df with model coefficients
+### ### ### df with model statistics
+update_interaction_result_df <- function(gis, prev){
+  all.gis <- rbind(prev[[1]], gis[[1]])
+  ests <- rbind(prev[[2]], data.frame(sgRNA.ID = i,tidy(gis[[3]])))
+  stats <- rbind(prev[[3]], data.frame(sgRNA.ID = i,glance(gis[[3]])))
+  
+  return(list(all.gis, ests, stats))
+}
+```
+
+Before computing GI scores, prepare directories to hold the resulting information. Note that directory structure handling happens automatically when using GI Nexus. Processing of individual replicates is commented out here, and it is highly recommended that the Snakemake workflow, which is parallelized, be used if this information is desired. 
+
+```{r dirstructure}
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/")
+}
+
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Compiled/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/Compiled/")
+}
+
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Compiled/Construct_Scores/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/Compiled/Construct_Scores/")
+}
+
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Compiled/GuideCombination_Scores/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/Compiled/GuideCombination_Scores/")
+}
+
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Compiled/GeneCombination_Scores/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/Compiled/GeneCombination_Scores/")
+}
+
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Compiled/Model_Results/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/Compiled/Model_Results/")
+}
+
+# if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Gamma.OI.R1/")){
+#  dir.create("manuscript_data/Screen2023/Interaction_Scores/Gamma.OI.R1/")
+# }
+
+# if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Gamma.OI.R2/")){
+#   dir.create("manuscript_data/Screen2023/Interaction_Scores/Gamma.OI.R2/")
+#}
+
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Gamma.OI.Avg/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/Gamma.OI.Avg/")
+}
+
+# if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Tau.OI.R1/")){
+#   dir.create("manuscript_data/Screen2023/Interaction_Scores/Tau.OI.R1/")
+# }
+
+# if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Tau.OI.R2/")){
+#   dir.create("manuscript_data/Screen2023/Interaction_Scores/Tau.OI.R2/")
+# }
+
+if(!dir.exists("manuscript_data/Screen2023/Interaction_Scores/Tau.OI.Avg/")){
+  dir.create("manuscript_data/Screen2023/Interaction_Scores/Tau.OI.Avg/")
+}
+
+```
+
+Once the directory structure has been established, models can be determined for each sgRNA and interaction scores called.
+
+```{r gis}
+# Calculate gamma and tau interaction scores, per replicate and averaged
+## Individual replicates are commented out for compilation
+# Loop over all sgRNAs, modeling each individually to get scores
+for(i in single.pheno.filt.gamma$sgRNA.ID){
+  
+  if(which(i == single.pheno.filt.gamma$sgRNA.ID) %% 100 == 0){
+    print(which(i == single.pheno.filt.gamma$sgRNA.ID))
+  }
+  
+  # Compute interactions for sgRNA i
+  # gamma.r1.gi <- compute_gis(i, single.pheno.filt.gamma, phenos.filt.gamma, "Gamma.OI.R1")
+  # gamma.r2.gi <- compute_gis(i, single.pheno.filt.gamma, phenos.filt.gamma, "Gamma.OI.R2")
+  gamma.oi.avg.gi <- compute_gis(i, single.pheno.filt.gamma, phenos.filt.gamma, "Gamma.OI.Avg")
+  
+  if(i %in% single.pheno.filt.tau$sgRNA.ID){
+    # tau.r1.gi <- compute_gis(i, single.pheno.filt.tau, phenos.filt.tau, "Tau.OI.R1")
+    # tau.r2.gi <- compute_gis(i, single.pheno.filt.tau, phenos.filt.tau, "Tau.OI.R2")
+    tau.oi.avg.gi <- compute_gis(i, single.pheno.filt.tau, phenos.filt.tau, "Tau.OI.Avg")
+  }
+  
+  # Save all results together
+  if(i == single.pheno.filt.gamma$sgRNA.ID[1]){
+    # gamma.r1.res <- create_interaction_result_df(gamma.r1.gi)
+    # gamma.r2.res <- create_interaction_result_df(gamma.r2.gi)
+    gamma.oi.avg.res <- create_interaction_result_df(gamma.oi.avg.gi)
+    if(i %in% single.pheno.filt.tau$sgRNA.ID){
+      # tau.r1.res <- create_interaction_result_df(tau.r1.gi)
+      # tau.r2.res <- create_interaction_result_df(tau.r2.gi)
+      tau.oi.avg.res <- create_interaction_result_df(tau.oi.avg.gi)
+    }
+  } else {
+    # gamma.r1.res <- update_interaction_result_df(gamma.r1.gi, gamma.r1.res)
+    # gamma.r2.res <- update_interaction_result_df(gamma.r2.gi, gamma.r2.res)
+    gamma.oi.avg.res <- update_interaction_result_df(gamma.oi.avg.gi, gamma.oi.avg.res)
+    if(i %in% single.pheno.filt.tau$sgRNA.ID){
+      # tau.r1.res <- update_interaction_result_df(tau.r1.gi, tau.r1.res)
+      # tau.r2.res <- update_interaction_result_df(tau.r2.gi, tau.r2.res)
+      tau.oi.avg.res <- update_interaction_result_df(tau.oi.avg.gi, tau.oi.avg.res)
+    }
+  }
+  # Write individual results tables
+  # write_tsv(gamma.r1.gi[[1]], paste("Screen2023/Interaction_Scores/Gamma.OI.R1/", i, ".txt", sep = ""))
+  # write_tsv(gamma.r2.gi[[1]], paste("Screen2023/Interaction_Scores/Gamma.OI.R2/", i, ".txt", sep = ""))
+  write_tsv(gamma.oi.avg.gi[[1]], paste("../manuscript_data/Screen2023/Interaction_Scores/Gamma.OI.Avg/", i, ".txt", sep = ""))
+  if(i %in% single.pheno.filt.tau$sgRNA.ID){
+    # write_tsv(tau.r1.gi[[1]], paste("Screen2023/Interaction_Scores/Tau.OI.R1/", i, ".txt", sep = ""))
+    # write_tsv(tau.r2.gi[[1]], paste("Screen2023/Interaction_Scores/Tau.OI.R2/", i, ".txt", sep = ""))
+    write_tsv(tau.oi.avg.gi[[1]], paste("../manuscript_data/Screen2023/Interaction_Scores/Tau.OI.Avg/", i, ".txt", sep = ""))
+  }
+}
+```
+
+After all interaction scores have been called, organize data for saving.
+
+```{r savegi}
+# Order table with all construct interaction scores by strength
+## Individual replicates are commented out for compilation
+# gamma.r1.res[[1]] <- gamma.r1.res[[1]][order(gamma.r1.res[[1]]$GI.z),]
+# gamma.r2.res[[1]] <- gamma.r2.res[[1]][order(gamma.r2.res[[1]]$GI.z),]
+gamma.oi.avg.res[[1]] <- gamma.oi.avg.res[[1]][order(gamma.oi.avg.res[[1]]$GI.z),]
+# tau.r1.res[[1]] <- tau.r1.res[[1]][order(tau.r1.res[[1]]$GI.z),]
+# tau.r2.res[[1]] <- tau.r2.res[[1]][order(tau.r2.res[[1]]$GI.z),]
+tau.oi.avg.res[[1]] <- tau.oi.avg.res[[1]][order(tau.oi.avg.res[[1]]$GI.z),]
+
+# Integrate gene and pseudogene information
+# gamma.r1.res[[1]] <- left_join(gamma.r1.res[[1]], counts[,c("FirstGene", "FirstPseudogene", 
+#                                                            "SecondGene", "SecondPseudogene", "ConstructID")]) %>%
+#  relocate(FirstGene:SecondPseudogene)
+# gamma.r2.res[[1]] <- left_join(gamma.r2.res[[1]], counts[,c("FirstGene", "FirstPseudogene", 
+#                                                             "SecondGene", "SecondPseudogene", "ConstructID")]) %>%
+#   relocate(FirstGene:SecondGene)
+gamma.oi.avg.res[[1]] <- left_join(gamma.oi.avg.res[[1]], counts[,c("FirstGene", "FirstPseudogene", 
+                                                            "SecondGene", "SecondPseudogene", "ConstructID")]) %>%
+  relocate(FirstGene:SecondPseudogene)
+# tau.r1.res[[1]] <- left_join(tau.r1.res[[1]], counts[,c("FirstGene", "FirstPseudogene", 
+#                                                             "SecondGene", "SecondPseudogene", "ConstructID")]) %>%
+#   relocate(FirstGene:SecondPseudogene)
+# tau.r2.res[[1]] <- left_join(tau.r2.res[[1]], counts[,c("FirstGene", "FirstPseudogene", 
+#                                                             "SecondGene", "SecondPseudogene", "ConstructID")]) %>%
+#   relocate(FirstGene:SecondPseudogene)
+tau.oi.avg.res[[1]] <- left_join(tau.oi.avg.res[[1]], counts[,c("FirstGene", "FirstPseudogene", 
+                                                            "SecondGene", "SecondPseudogene", "ConstructID")]) %>%
+  relocate(FirstGene:SecondPseudogene)
+
+# Save individual construct scores
+con_path_pfx <- "../manuscript_data/Screen2023/Interaction_Scores/Compiled/Construct_Scores/"
+# write_tsv(gamma.r1.res[[1]], paste(con_path_pfx, "all_interaction_scores_gamma_oi_r1.txt", sep = ""))
+# write_tsv(gamma.r2.res[[1]], paste(con_path_pfx, "all_interaction_scores_gamma_oi_r2.txt", sep = ""))
+write_tsv(gamma.oi.avg.res[[1]], paste(con_path_pfx, "all_interaction_scores_gamma_oi_avg.txt", sep = ""))
+# write_tsv(tau.r1.res[[1]], paste(con_path_pfx, "all_interaction_scores_tau_oi_r1.txt", sep = ""))
+# write_tsv(tau.r2.res[[1]], paste(con_path_pfx, "all_interaction_scores_tau_oi_r2.txt", sep = ""))
+write_tsv(tau.oi.avg.res[[1]], paste(con_path_pfx, "all_interaction_scores_tau_oi_avg.txt", sep = ""))
+# Save model estimate information
+mod_path_pfx <- "../manuscript_data/Screen2023/Interaction_Scores/Compiled/Model_Results/"
+# write_tsv(gamma.r1.res[[2]], paste(mod_path_pfx, "model_estimates_gamma_oi_r1.txt", sep = ""))
+# write_tsv(gamma.r2.res[[2]], paste(mod_path_pfx, "model_estimates_gamma_oi_r2.txt", sep = ""))
+write_tsv(gamma.oi.avg.res[[2]], paste(mod_path_pfx, "model_estimates_gamma_oi_avg.txt", sep = ""))
+# write_tsv(tau.r1.res[[2]], paste(mod_path_pfx, "model_estimates_tau_oi_r1.txt", sep = ""))
+# write_tsv(tau.r2.res[[2]], paste(mod_path_pfx, "model_estimates_tau_oi_r2.txt", sep = ""))
+write_tsv(tau.oi.avg.res[[2]], paste(mod_path_pfx, "model_estimates_tau_oi_avg.txt", sep = ""))
+# Save model statistic information
+# write_tsv(gamma.r1.res[[3]], paste(mod_path_pfx, "model_statistics_gamma_oi_r1.txt", sep = ""))
+# write_tsv(gamma.r2.res[[3]], paste(mod_path_pfx, "model_statistics_gamma_oi_r2.txt", sep = ""))
+write_tsv(gamma.oi.avg.res[[3]], paste(mod_path_pfx, "model_statistics_gamma_oi_avg.txt", sep = ""))
+# write_tsv(tau.r1.res[[3]], paste(mod_path_pfx, "model_statistics_tau_oi_r1.txt", sep = ""))
+# write_tsv(tau.r2.res[[3]], paste(mod_path_pfx, "model_statistics_tau_oi_r2.txt", sep = ""))
+write_tsv(tau.oi.avg.res[[3]], paste(mod_path_pfx, "model_statistics_tau_oi_avg.txt", sep = ""))
+
+head(gamma.oi.avg.res[[1]])
+head(tau.oi.avg.res[[1]])
+```
+
+Now that interaction scores have been called for each construct, interaction scores can be aggregated to sgRNA- and gene-level. We have provided two functions for performing these tasks below.
+
+When generating gene-level scores for same gene pairs (X+X), only distinct combinations of sgRNAs are considered. These scores are not truly gene-level GIs, but more accurately represent the effects of having two CRISPRi sgRNAs targeting the same gene. Strong synergistic scores for these pairs are indicative of more complete inhibition of essential gene expression, which has a pronounced effect on cell health. 
+
+```{r giaggfuncs}
+### Function for aggregating the results from compute_gis across constructs
+### Inputs:
+### ### gis - final full output from update_interaction_result_df
+### Outputs:
+### ### df containing GI scores averaged across sgRNA IDs
+compute_sgc_interaction_scores <- function(gis){
+  info.cols <- c("GuideCombinationID", "GeneCombinationID", "Category", "Control", "GI.z")
+  orient <- gis[,colnames(gis) %in% info.cols] %>% 
+              group_by(GuideCombinationID) %>% 
+              mutate(InteractionScore = mean(GI.z), N = n()) %>%
+              select(-GI.z) %>% unique()
+  return(orient)
+}
+
+### Function for aggregating the results from compute_gis across constructs
+### Update with option to use pseudogene identifiers
+### Inputs:
+### ### gis - final full output from update_interaction_result_df
+### ### scorecol - column name that contains the interaction scores to be aggregated to gene level
+### Outputs:
+### ### df containing gene-level GI scores
+compute_gene_interaction_scores <- function(gis, scorecol){
+  info.cols <- c("GuideCombinationID", "PseudogeneCombinationID", "Identical", "Category", "Control", scorecol)
+  gene.gis <- gis[,colnames(gis) %in% info.cols] %>% 
+                group_by(PseudogeneCombinationID) %>% 
+                filter(Identical == FALSE) %>%
+                mutate(InteractionScore = mean(!!sym(scorecol)), N = n()) %>%
+                select(c(PseudogeneCombinationID, Category, InteractionScore, N)) %>% unique()
+  return(gene.gis)
+}
+```
+
+Then apply these functions to the previously called GI scores.
+
+```{r giagg}
+# Calculate guide combination (orientation-independent) interaction scores
+## Commented out for compilation
+# gamma.r1.all.gis.orient <- compute_sgc_interaction_scores(gamma.r1.res[[1]])
+# gamma.r2.all.gis.orient <- compute_sgc_interaction_scores(gamma.r2.res[[1]])
+# gamma.oi.avg.all.gis.orient <- compute_sgc_interaction_scores(gamma.oi.avg.res[[1]])
+# tau.r1.all.gis.orient <- compute_sgc_interaction_scores(tau.r1.res[[1]])
+# tau.r2.all.gis.orient <- compute_sgc_interaction_scores(tau.r2.res[[1]])
+# tau.oi.avg.all.gis.orient <- compute_sgc_interaction_scores(tau.oi.avg.res[[1]])
+
+# Calculate gene combination interaction scores
+## Individual replicates commented out for compilation
+# gamma.r1.gene.gis <- compute_gene_interaction_scores(gamma.r1.res[[1]], "GI.z")
+# gamma.r2.gene.gis <- compute_gene_interaction_scores(gamma.r2.res[[1]], "GI.z")
+gamma.oi.avg.gene.gis <- compute_gene_interaction_scores(gamma.oi.avg.res[[1]], "GI.z")
+# tau.r1.gene.gis <- compute_gene_interaction_scores(tau.r1.res[[1]], "GI.z")
+# tau.r2.gene.gis <- compute_gene_interaction_scores(tau.r2.res[[1]], "GI.z")
+tau.oi.avg.gene.gis <- compute_gene_interaction_scores(tau.oi.avg.res[[1]], "GI.z")
+# Add gene information back into the results
+# gamma.r1.gene.gis <- left_join(gamma.r1.gene.gis, idmap) %>% relocate(Pseudogene1:PseudogeneCombinationName)
+# gamma.r2.gene.gis <- left_join(gamma.r2.gene.gis, idmap) %>% relocate(Pseudogene1:PseudogeneCombinationName)
+gamma.oi.avg.gene.gis <- left_join(gamma.oi.avg.gene.gis, idmap) %>% relocate(Pseudogene1:PseudogeneCombinationName)
+# tau.r1.gene.gis <- left_join(tau.r1.gene.gis, idmap) %>% relocate(Pseudogene1:PseudogeneCombinationName)
+# tau.r2.gene.gis <- left_join(tau.r2.gene.gis, idmap) %>% relocate(Pseudogene1:PseudogeneCombinationName)
+tau.oi.avg.gene.gis <- left_join(tau.oi.avg.gene.gis, idmap) %>% relocate(Pseudogene1:PseudogeneCombinationName)
+
+# Save guide combination (orientation-independent) interaction scores
+sgc_path_pfx <- "../manuscript_data/Screen2023/Interaction_Scores/Compiled/GuideCombination_Scores/"
+# write_tsv(gamma.r1.all.gis.orient, paste(sgc_path_pfx, "guide_combination_interaction_scores_gamma_oi_r1.txt", sep = ""))
+# write_tsv(gamma.r2.all.gis.orient, paste(sgc_path_pfx, "guide_combination_interaction_scores_gamma_oi_r2.txt", sep = ""))
+# write_tsv(gamma.oi.avg.all.gis.orient, paste(sgc_path_pfx, "guide_combination_interaction_scores_gamma_oi_avg.txt", sep = ""))
+# write_tsv(tau.r1.all.gis.orient, paste(sgc_path_pfx, "guide_combination_interaction_scores_tau_oi_r1.txt", sep = ""))
+# write_tsv(tau.r2.all.gis.orient, paste(sgc_path_pfx, "guide_combination_interaction_scores_tau_oi_r2.txt", sep = ""))
+# write_tsv(tau.oi.avg.all.gis.orient, paste(sgc_path_pfx, "guide_combination_interaction_scores_tau_oi_avg.txt", sep = ""))
+
+# Save gene combination interaction scores
+gc_path_pfx <- "../manuscript_data/Screen2023/Interaction_Scores/Compiled/GeneCombination_Scores/"
+# write_tsv(gamma.r1.gene.gis, paste(gc_path_pfx, "gene_combination_interaction_scores_gamma_oi_r1.txt", sep = ""))
+# write_tsv(gamma.r2.gene.gis, paste(gc_path_pfx, "gene_combination_interaction_scores_gamma_oi_r2.txt", sep = ""))
+write_tsv(gamma.oi.avg.gene.gis, paste(gc_path_pfx, "gene_combination_interaction_scores_gamma_oi_avg.txt", sep = ""))
+# write_tsv(tau.r1.gene.gis, paste(gc_path_pfx, "gene_combination_interaction_scores_tau_oi_r1.txt", sep = ""))
+# write_tsv(tau.r2.gene.gis, paste(gc_path_pfx, "gene_combination_interaction_scores_tau_oi_r2.txt", sep = ""))
+write_tsv(tau.oi.avg.gene.gis, paste(gc_path_pfx, "gene_combination_interaction_scores_tau_oi_avg.txt", sep = ""))
+
+head(gamma.oi.avg.gene.gis)
+head(tau.oi.avg.gene.gis)
+```
+
+The above gene-level GI scores only consider the average of all contributing sgRNA-level scores, and as such, could represent signals driven by outliers rather than a consistent measurement. To assess this possibility, we compare the sgRNA-level GI score distributions for each gene pair relative to the non-targeting distributions to identify gene pairs which have an overall consistency. The p-values generated from this process can be used in combination with GI magnitudes to improve the identification of reliable GI calls. We provide a function for doing so below.
+
+```{r varfunc}
+### Function for assessing the variance of sgRNA-level GI scores that contribute to gene-level GI scores
+### Inputs:
+### ### congis - final full output from update_interaction_result_df
+### ### genegis - output from compute_gene_interaction_scores, must have columns Gene1 and Gene2 included
+### Outputs:
+### ### df containing GI scores averaged across sgRNA IDs
+assess_sgcscore_variance <- function(congis, genegis){
+  
+  genegis$Variance.p <- NA
+  genegis$Variance.N.NT <- NA
+  genegis$Variance.N.Test <- NA
+  k <- 1
+  for(i in unique(genegis$PseudogeneCombinationID)){
+    
+    if(k %% 10000 == 0){
+      print(k)
+    }
+    
+    gene1 <- genegis$Pseudogene1[genegis$PseudogeneCombinationID == i]
+    gene2 <- genegis$Pseudogene2[genegis$PseudogeneCombinationID == i]
+  
+    tmp <- congis[congis$SecondPseudogene == gene1 | congis$SecondPseudogene == gene2,]
+    
+    if(grepl("NTPG", gene1) & grepl("NTPG", gene2)) {
+      tmp <- tmp[tmp$PseudogeneCombinationID == i | 
+                    (tmp$Category == "NT+NT" & tmp$SecondPseudogene == gene1) |
+                    (tmp$Category == "NT+NT" & tmp$SecondPseudogene == gene2),]
+    } else if(grepl("NTPG", gene1)){
+      tmp <- tmp[tmp$PseudogeneCombinationID == i | 
+                    (tmp$Category == "NT+NT" & tmp$SecondPseudogene == gene1) |
+                    (tmp$Category == "X+NT" & tmp$SecondPseudogene == gene2),]
+    } else if(grepl("NTPG", gene2)) {
+      tmp <- tmp[tmp$PseudogeneCombinationID == i | 
+                    (tmp$Category == "NT+NT" & tmp$SecondPseudogene == gene2) |
+                    (tmp$Category == "X+NT" & tmp$SecondPseudogene == gene1),]
+    } else {
+      tmp <- tmp[tmp$PseudogeneCombinationID == i | tmp$Category == "X+NT",]
+    }
+    
+    tmp$TestDist <- tmp$PseudogeneCombinationID == i
+    tmp <- tmp[!tmp$Identical,]
+
+    if(length(unique(tmp$TestDist)) == 1){
+      next
+    }
+    
+    genegis$Variance.p[genegis$PseudogeneCombinationID == i] <- wilcox.test(GI.z ~ TestDist, data = tmp)$p.value
+    genegis$Variance.N.NT[genegis$PseudogeneCombinationID == i] <- sum(!tmp$TestDist)
+    genegis$Variance.N.Test[genegis$PseudogeneCombinationID == i] <- sum(tmp$TestDist)
+    
+    k <- k+1
+  }
+  
+  return(genegis)
+}
+```
+
+We only apply this function to replicate-averaged results here, but a replicate-independent analysis can easily be accomplished using the above function with appropriate inputs.
+
+```{r testvar}
+# Calculated Mann-Whitney p-values for each guide
+## Commented out for compilation
+# gamma.oi.avg.gene.gis.var <- assess_sgcscore_variance(gamma.oi.avg.res[[1]], gamma.oi.avg.gene.gis)
+# tau.oi.avg.gene.gis.var <- assess_sgcscore_variance(tau.oi.avg.res[[1]], tau.oi.avg.gene.gis)
+
+# gamma.oi.avg.gene.gis.var$Discriminant <- -log10(gamma.oi.avg.gene.gis.var$Variance.p) * abs(gamma.oi.avg.gene.gis.var$InteractionScore)
+# tau.oi.avg.gene.gis.var$Discriminant <- -log10(tau.oi.avg.gene.gis.var$Variance.p) * abs(tau.oi.avg.gene.gis.var$InteractionScore)
+
+# write_tsv(gamma.oi.avg.gene.gis.var,
+#           paste(gc_path_pfx, "gene_combination_interaction_scores_discriminant_gamma_oi_avg.txt", sep = ""))
+# write_tsv(tau.oi.avg.gene.gis.var,
+#           paste(gc_path_pfx, "gene_combination_interaction_scores_discriminant_tau_oi_avg.txt", sep = ""))
+
+# head(gamma.oi.avg.gene.gis.var)
+# head(tau.oi.avg.gene.gis.var)
+```
+
+Finally, nu GI scores can be calculated. This is done at the construct level, so that the gamma and tau GI scores for individual orientation-dependent sgRNA combinations are directly compared. Since the correlation filter additionally removed sgRNAs from the tau GI set, the construct scores must first be unified before calculating nu GIs. Once that has been performed, nu GI scores are calculated as \tau GI - \gamma GI for each construct, then gene-level GI scores can be determined as above. We provide a function for performing these operations below.
+
+```{r nugifuncs}
+compute_construct_differential_scores <- function(gamma, tau){
+  info_cols <- c(colnames(gamma)[1:14], "GI.z") #meta info columns + GI scores
+  pm <- inner_join(gamma[,colnames(gamma) %in% info_cols], 
+                   tau[,colnames(tau) %in% info_cols],
+                   by = info_cols[1:14],
+                   suffix = c(".Gamma", ".Tau"))
+  pm$GI.z <- pm$GI.z.Tau - pm$GI.z.Gamma
+  return(pm)
+}
+```
+
+Calculate nu GI scores, assess variance, and arrange data for export.
+
+```{r calcnu}
+# Calculate differential scores
+nu.oi.avg <- compute_construct_differential_scores(gamma.oi.avg.res[[1]], 
+                                                   tau.oi.avg.res[[1]])
+nu.oi.avg.gene.gis <- compute_gene_interaction_scores(nu.oi.avg, "GI.z")
+nu.oi.avg.gene.gis <- left_join(nu.oi.avg.gene.gis, idmap) %>% relocate(Pseudogene1:PseudogeneCombinationName)
+
+# Commented out for compilation
+#nu.oi.avg.gene.gis.var <- assess_sgcscore_variance(nu.oi.avg, nu.oi.avg.gene.gis)
+
+# nu.oi.avg.gene.gis.var$Discriminant <- -log10(nu.oi.avg.gene.gis.var$Variance.p) *  abs(nu.oi.avg.gene.gis.var$InteractionScore)
+ 
+# write_tsv(nu.oi.avg,
+#           paste0(con_path_pfx, "all_interaction_scores_nu_oi_avg.txt"))
+# write_tsv(nu.oi.avg.gene.gis.var,
+#           paste(gc_path_pfx, "gene_combination_interaction_scores_discriminant_nu_oi_avg.txt", sep = ""))
+
+head(nu.oi.avg.gene.gis)
+```
+
+Congrats! You made it to the end and processed a multi-arm genetic interaction screen.
