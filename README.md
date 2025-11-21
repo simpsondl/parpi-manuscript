@@ -1,6 +1,6 @@
 # Mapping the Genetic Interaction Network of PARPi Response
 
-[![Snakemake](https://img.shields.io/badge/snakemake-≥9.12.0-brightgreen.svg?style=flat)](https://snakemake.readthedocs.io) [![License: CC BY 4.0](https://img.shields.io/badge/License-CC_BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
+[![Snakemake](https://img.shields.io/badge/snakemake-≥9.12.0-brightgreen.svg?style=flat)](https://snakemake.readthedocs.io) [![License: CC BY 4.0](https://img.shields.io/badge/License-CC_BY_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![DOI](https://zenodo.org/badge/1095847012.svg)](https://doi.org/10.5281/zenodo.17666844)
 
 This repository contains the reproducible analysis code and data for our PARP inhibitor genetic interaction manuscript. It is a frozen snapshot of an early GI Nexus build (v1.0-beta) specifically configured to regenerate all analyses and key figures presented [in our publication](https://www.biorxiv.org/content/10.1101/2023.08.19.553986v1).
 
